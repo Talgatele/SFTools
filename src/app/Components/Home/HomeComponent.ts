@@ -1,18 +1,12 @@
 import {Component, ChangeDetectionStrategy} from '@angular/core';
 import {RouterLink} from '@angular/router';
 import {FaIconComponent} from '@fortawesome/angular-fontawesome';
-import {faArrowRight, faBookOpen, faCircleInfo, faCircleQuestion, faDesktop, faDiagramProject, faHeart, faPlay, faPlus, faPuzzlePiece, faRightFromBracket, faShareNodes, faSliders, faUser, faXmark} from '@fortawesome/free-solid-svg-icons';
-import {OAuthProviderButtonsComponent} from '@src/Components/Auth/OAuthProviderButtonsComponent';
+import {faArrowRight, faBookOpen, faCircleInfo, faCircleQuestion, faDesktop, faDiagramProject, faHeart, faPlay, faPlus, faPuzzlePiece, faShareNodes, faSliders, faXmark} from '@fortawesome/free-solid-svg-icons';
 import {SupporterTickerComponent} from '@src/Components/Supporters/SupporterTickerComponent';
-import {InfoNoteComponent} from '@src/Components/Common/InfoNoteComponent';
 import {HomeFeature} from '@src/Components/Home/HomeFeature';
 import {VersionTag} from '@src/Components/Home/VersionTag';
 import {Version} from '@src/Model/API/Schema/Version';
 import {WorldDataPayload} from '@src/Model/API/Schema/World/WorldDataPayload';
-import {AccountProfileService} from '@src/Model/Auth/AccountProfileService';
-import {AuthService} from '@src/Model/Auth/AuthService';
-import {LogoutService} from '@src/Model/Auth/LogoutService';
-import {SignInPromptService} from '@src/Model/Auth/SignInPromptService';
 import {CommunityLinks} from '@src/Model/CommunityLinks';
 import {VersionManager} from '@src/Model/Data/VersionManager';
 import {LocalPlanStoreBackend} from '@src/Model/Planner/LocalPlanStoreBackend';
@@ -46,7 +40,7 @@ const WORLD_PURITY_LABELS: Record<string, string> = {
 @Component({
 	templateUrl: './HomeComponent.html',
 	changeDetection: ChangeDetectionStrategy.Eager,
-	imports: [RouterLink, FaIconComponent, OAuthProviderButtonsComponent, InfoNoteComponent, HelpButtonComponent, SupporterTickerComponent],
+	imports: [RouterLink, FaIconComponent, HelpButtonComponent, SupporterTickerComponent],
 	styles: [`
 		:host {
 			display: block;
@@ -513,12 +507,10 @@ export class HomeComponent
 	public readonly faXmark = faXmark;
 	public readonly faPuzzlePiece = faPuzzlePiece;
 	public readonly faSliders = faSliders;
-	public readonly faUser = faUser;
 	public readonly faCircleInfo = faCircleInfo;
 	public readonly faDesktop = faDesktop;
 	public readonly faCircleQuestion = faCircleQuestion;
 	public readonly faHeart = faHeart;
-	public readonly faRightFromBracket = faRightFromBracket;
 	public readonly communityLinks = CommunityLinks.COMMUNITY;
 	public readonly donationLinks = CommunityLinks.DONATIONS;
 	public readonly faDiagramProject = faDiagramProject;
@@ -530,11 +522,7 @@ export class HomeComponent
 
 	public constructor(
 		protected readonly versionManager: VersionManager,
-		protected readonly auth: AuthService,
-		protected readonly signInPrompt: SignInPromptService,
-		protected readonly account: AccountProfileService,
 		private readonly planCounts: PlanCountsService,
-		private readonly logoutService: LogoutService,
 		private readonly plannerLocation: PlannerLocationService,
 		storage: AppStorage,
 		private readonly offlineVersions: OfflineVersionsService,
@@ -638,9 +626,9 @@ export class HomeComponent
 				}
 				: {
 					icon: faPuzzlePiece,
-					title: 'Mods',
-					text: 'Create sets of changes to the game data - new or changed items, recipes and buildings - and share them.',
-					link: ['/mods'],
+					title: 'Mod editor',
+					text: 'Create local sets of changes to game data for use with custom versions.',
+					link: ['/mod-editor'],
 				},
 		];
 	}
@@ -648,18 +636,7 @@ export class HomeComponent
 	public planCountLabel(version: Version): string | null
 	{
 		const local = this.localPlanStore.countPlans(version.id);
-		if (!this.auth.isAuthenticated()) {
-			return local === 0 ? null : `${local} plan${local === 1 ? '' : 's'}`;
-		}
-		const account = this.planCounts.countFor(version.id)?.planCount ?? 0;
-		const parts: string[] = [];
-		if (account > 0) {
-			parts.push(`${account} plan${account === 1 ? '' : 's'}`);
-		}
-		if (local > 0) {
-			parts.push(account > 0 ? `${local} on this device` : `${local} plan${local === 1 ? '' : 's'} on this device`);
-		}
-		return parts.length === 0 ? null : parts.join(' · ');
+		return local === 0 ? null : `${local} plan${local === 1 ? '' : 's'}`;
 	}
 
 	public lastEditedLabel(version: Version): string | null
@@ -670,11 +647,6 @@ export class HomeComponent
 		}
 		const ago = RelativeTimeFormatter.ago(count.lastPlanUpdatedAt);
 		return ago === '' ? null : `edited ${ago}`;
-	}
-
-	public logout(): void
-	{
-		this.logoutService.logout();
 	}
 
 	public isLastVisited(version: Version): boolean

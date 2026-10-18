@@ -23,7 +23,7 @@ export class HelpEditorGuard
 	public canActivate(): boolean | UrlTree | Observable<boolean | UrlTree>
 	{
 		if (!this.auth.isAuthenticated()) {
-			return this.router.createUrlTree(['/auth/login']);
+			return this.router.createUrlTree(['/']);
 		}
 		if (this.profile.helpEditor()) {
 			return true;

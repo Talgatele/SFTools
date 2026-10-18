@@ -9,9 +9,7 @@ import {NavbarVersionSwitcherComponent} from '@src/Components/Root/NavbarVersion
 import {NavbarSearchComponent} from '@src/Components/Root/NavbarSearchComponent';
 import {MobileSearchComponent} from '@src/Components/Root/MobileSearchComponent';
 import {NavbarCommunityLinksComponent} from '@src/Components/Root/NavbarCommunityLinksComponent';
-import {NavbarUserDropdownComponent} from '@src/Components/Root/NavbarUserDropdownComponent';
 import {AppTooltipDirective} from '@src/Components/Common/AppTooltipDirective';
-import {AccountProfileService} from '@src/Model/Auth/AccountProfileService';
 import {VersionManager} from '@src/Model/Data/VersionManager';
 import {HelpManager} from '@src/Model/Help/HelpManager';
 import {HotkeyRegistration} from '@src/Model/Hotkeys/HotkeyRegistration';
@@ -30,7 +28,6 @@ import {BackToPlannerResolver} from '@src/Model/Planner/BackToPlannerResolver';
 		NavbarVersionSwitcherComponent,
 		NavbarSearchComponent,
 		MobileSearchComponent,
-		NavbarUserDropdownComponent,
 		NavbarCommunityLinksComponent,
 		AppTooltipDirective,
 	],
@@ -150,7 +147,6 @@ export class NavbarComponent implements OnDestroy
 	protected readonly helpAvailable = computed(() => this.help.hasArticles());
 
 	public constructor(
-		protected readonly account: AccountProfileService,
 		protected readonly versionManager: VersionManager,
 		private readonly help: HelpManager,
 		private readonly backToPlanner: BackToPlannerResolver,

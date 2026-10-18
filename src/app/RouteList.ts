@@ -14,19 +14,12 @@ import {ModListComponent} from '@src/Components/Mods/ModListComponent';
 import {PlannerComponent} from '@src/Components/Planner/PlannerComponent';
 import {SettingsComponent} from '@src/Components/Settings/SettingsComponent';
 import {ShareRedirectComponent} from '@src/Components/Shares/ShareRedirectComponent';
-import {AuthGuard} from '@src/Model/Auth/AuthGuard';
 import {HelpEditorGuard} from '@src/Model/Help/HelpEditorGuard';
 import {NotFoundComponent} from '@src/Components/Errors/NotFoundComponent';
 import {LegacyUrlRedirectComponent} from '@src/Components/Legacy/LegacyUrlRedirectComponent';
 import {VersionsResolver} from '@src/Model/Data/VersionsResolver';
 import {VersionDataResolver} from '@src/Model/Data/VersionDataResolver';
 import {SettingsResolver} from '@src/Model/Settings/SettingsResolver';
-import {LoginComponent} from '@src/Components/Auth/LoginComponent';
-import {OAuthCallbackComponent} from '@src/Components/Auth/OAuthCallbackComponent';
-import {RegisterComponent} from '@src/Components/Auth/RegisterComponent';
-import {ForgotPasswordComponent} from '@src/Components/Auth/ForgotPasswordComponent';
-import {ResetPasswordComponent} from '@src/Components/Auth/ResetPasswordComponent';
-import {AccountComponent} from '@src/Components/Account/AccountComponent';
 
 export class RouteList
 {
@@ -118,8 +111,7 @@ export class RouteList
 				{
 					path: 'mods',
 					title: 'Mods',
-					data: {description: 'Upload and manage mod data, then use the mods in your custom game versions.'},
-					canActivate: [AuthGuard],
+					data: {description: 'Browse public mod data and create local mod data for custom game versions.'},
 					children: [
 						{
 							path: '',
@@ -164,42 +156,8 @@ export class RouteList
 					data: {description: 'Guides and reference for Satisfactory Tools.'},
 					component: HelpPageComponent,
 				},
-				{
-					path: 'auth',
-					children: [
-						{
-							path: 'login',
-							title: 'Sign in',
-							component: LoginComponent,
-						},
-						{
-							path: 'register',
-							title: 'Register',
-							component: RegisterComponent,
-						},
-						{
-							path: 'forgot-password',
-							title: 'Forgot password',
-							component: ForgotPasswordComponent,
-						},
-						{
-							path: 'reset-password',
-							title: 'Reset password',
-							component: ResetPasswordComponent,
-						},
-						{
-							path: 'callback/:provider',
-							title: 'Sign in',
-							component: OAuthCallbackComponent,
-						},
-					],
-				},
-				{
-					path: 'account',
-					title: 'Account',
-					canActivate: [AuthGuard],
-					component: AccountComponent,
-				},
+				{path: 'auth', redirectTo: '/', pathMatch: 'prefix'},
+				{path: 'account', redirectTo: '/', pathMatch: 'prefix'},
 				{
 					// Must precede the ':versionSlug' catch-all.
 					path: 'shared/:shareId',

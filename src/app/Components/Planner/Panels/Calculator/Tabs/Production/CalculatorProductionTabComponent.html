@@ -60,6 +60,7 @@
 									<option value="GW">GW</option>
 									<option value="TW">TW</option>
 									<option value="maximise" [disabled]="maximiseDisabled(row)">maximise</option>
+									<option value="satisfactory" [disabled]="maximiseDisabled(row, 'satisfactory')">Satisfactory mode</option>
 								</select>
 							} @else {
 								<select
@@ -71,6 +72,7 @@
 								>
 									<option value="rate">{{ rateUnit(row.itemClassName) }}</option>
 									<option value="maximise" [disabled]="maximiseDisabled(row)">maximise</option>
+									<option value="satisfactory" [disabled]="maximiseDisabled(row, 'satisfactory')">Satisfactory mode</option>
 								</select>
 							}
 						</div>
@@ -86,6 +88,12 @@
 			}
 		</tbody>
 	</table>
+
+	@if (hasSatisfactoryMode) {
+		<info-note class="mb-2">
+			Satisfactory mode maximises production, then rebuilds the plan at a nearby whole rate when possible, otherwise a half or one-decimal rate. Outputs below 0.1/min keep their exact maximum.
+		</info-note>
+	}
 
 	<button class="btn btn-sm btn-outline-success w-100" type="button" (click)="addRow()">
 		+ Add Item

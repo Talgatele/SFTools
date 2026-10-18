@@ -1,6 +1,6 @@
 <div class="home">
 
-	<section class="hero" [class.with-side]="signInPrompt.enabled() || auth.isAuthenticated()">
+	<section class="hero">
 		<div>
 			<div class="hero-brand">
 				<img src="/assets/satisfactory.png" alt="Satisfactory">
@@ -64,49 +64,6 @@
 			</div>
 		</div>
 
-		@if (signInPrompt.enabled()) {
-			<aside class="card border-secondary side-card">
-				<div class="card-header">
-					<div class="fw-semibold">Keep your factories safe</div>
-					<div class="small text-secondary">Sign in to sync plans, custom versions and settings across devices.</div>
-				</div>
-				<div class="card-body">
-					<oauth-provider-buttons verb="Sign in with" returnUrl="/"></oauth-provider-buttons>
-					<info-note class="mt-2 side-note">Steam cannot create a new account. Sign in another way first, then connect Steam on your account page.</info-note>
-					<div class="text-center small mt-2">
-						<a routerLink="/auth/login" [queryParams]="{method: 'password'}">Sign in with username &amp; password</a>
-						<span class="text-secondary"> · </span>
-						<a routerLink="/auth/register">Create account</a>
-					</div>
-				</div>
-				<div class="card-footer d-flex justify-content-between align-items-center small">
-					<span class="text-secondary">Everything also works without an account.</span>
-					<button type="button" class="btn btn-link btn-sm p-0 text-secondary" (click)="signInPrompt.disable()">Don't remind me</button>
-				</div>
-			</aside>
-		} @else if (auth.isAuthenticated()) {
-			<aside class="card border-secondary side-card">
-				<div class="card-header d-flex align-items-center gap-3">
-					@if (account.avatarUrl(); as avatar) {
-						<img class="welcome-avatar" [src]="avatar" alt="">
-					}
-					<div>
-						<div class="fw-semibold">Welcome back{{ account.name() ? ', ' + account.name() : '' }}</div>
-						<div class="small text-secondary">Your plans and versions are synced to this account.</div>
-					</div>
-				</div>
-				<div class="card-body quick-links">
-					<a routerLink="/create-version"><fa-icon [icon]="faSliders" [fixedWidth]="true" class="text-info"></fa-icon> Create a custom version</a>
-					<a routerLink="/mods"><fa-icon [icon]="faPuzzlePiece" [fixedWidth]="true" class="text-info"></fa-icon> Manage mods</a>
-					<a routerLink="/account"><fa-icon [icon]="faUser" [fixedWidth]="true" class="text-info"></fa-icon> Account &amp; sign-in methods</a>
-				</div>
-				<div class="card-footer d-flex justify-content-end">
-					<button type="button" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-2" (click)="logout()">
-						<fa-icon [icon]="faRightFromBracket"></fa-icon> Sign out
-					</button>
-				</div>
-			</aside>
-		}
 	</section>
 
 	<section>

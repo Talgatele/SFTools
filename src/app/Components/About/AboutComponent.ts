@@ -2,7 +2,6 @@ import {Component, ChangeDetectionStrategy, effect} from '@angular/core';
 import {ActivatedRoute, RouterLink} from '@angular/router';
 import {FaIconComponent} from '@fortawesome/angular-fontawesome';
 import {faBookOpen, faDesktop, faDiagramProject, faHeart, faPuzzlePiece, faSliders} from '@fortawesome/free-solid-svg-icons';
-import {AccountProfileService} from '@src/Model/Auth/AccountProfileService';
 import {CommunityLinks} from '@src/Model/CommunityLinks';
 import {SupporterListService} from '@src/Model/Supporters/SupporterListService';
 import {BackLinkComponent} from '@src/Components/Common/BackLinkComponent';
@@ -162,7 +161,7 @@ export class AboutComponent
 
 	public readonly features: HomeFeature[];
 
-	public constructor(platform: AppPlatform, protected readonly supporterList: SupporterListService, account: AccountProfileService, route: ActivatedRoute)
+	public constructor(platform: AppPlatform, protected readonly supporterList: SupporterListService, route: ActivatedRoute)
 	{
 		// The home page links to #supporters, which only exists once the list is there - too late for the router.
 		let scrolled = route.snapshot.fragment !== 'supporters';
@@ -173,11 +172,7 @@ export class AboutComponent
 			}
 		});
 
-		// Reloaded when the viewer changes their own entry (e.g. in the thank-you dialog over this page).
-		effect(() => {
-			account.supporter();
-			supporterList.reload();
-		});
+		supporterList.reload();
 
 		this.features = [
 			{

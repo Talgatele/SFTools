@@ -49,14 +49,17 @@ export class OldPlanImporter
 
 	public async withGraph(plan: Plan, source: OldProductionData, sourceVersion: OldGameVersion, data: Data): Promise<OldPlanImport>
 	{
-		const carried = this.nodesFromOldResult(source.result, plan, data);
-		if (carried !== null) {
-			return {plan: await this.layOut(plan, carried.nodes, carried.achievedMaximums), graphSource: 'carried'};
-		}
+		const hasSatisfactoryMode = plan.requests.some(request => request.mode === 'satisfactory');
+		if (!hasSatisfactoryMode) {
+			const carried = this.nodesFromOldResult(source.result, plan, data);
+			if (carried !== null) {
+				return {plan: await this.layOut(plan, carried.nodes, carried.achievedMaximums), graphSource: 'carried'};
+			}
 
-		const legacy = this.nodesFromOldResult(await this.solveTheOldWay(source, sourceVersion), plan, data);
-		if (legacy !== null) {
-			return {plan: await this.layOut(plan, legacy.nodes, legacy.achievedMaximums), graphSource: 'legacy'};
+			const legacy = this.nodesFromOldResult(await this.solveTheOldWay(source, sourceVersion), plan, data);
+			if (legacy !== null) {
+				return {plan: await this.layOut(plan, legacy.nodes, legacy.achievedMaximums), graphSource: 'legacy'};
+			}
 		}
 
 		try {
@@ -114,7 +117,9 @@ export class OldPlanImporter
 		if (conversion.nodes.length === 0 || conversion.unknownClassNames.length > 0) {
 			return null;
 		}
-		const maximised = new Set(plan.requests.filter(request => request.mode === 'maximise').map(request => request.itemClassName));
+		const maximised = new Set(plan.requests
+			.filter(request => request.mode === 'maximise' || request.mode === 'satisfactory')
+			.map(request => request.itemClassName));
 		let achievedMaximums: Record<string, number> | undefined;
 		for (const node of conversion.nodes) {
 			if (node instanceof ProductNode && maximised.has(node.item.className)) {

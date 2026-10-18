@@ -5,7 +5,7 @@
 	<div class="row g-3">
 		<div class="col-12 col-md-4 col-lg-3 d-flex flex-column gap-3">
 			<nav class="settings-nav" aria-label="Settings sections">
-				@for (section of visibleSections(); track section.id) {
+				@for (section of sections; track section.id) {
 					<button
 						type="button"
 						[class.active]="activeSection() === section.id"
@@ -24,11 +24,7 @@
 				><fa-icon [icon]="faRotateLeft"></fa-icon> Reset all settings</button>
 			}
 			<info-note class="d-none d-md-flex">
-				@if (auth.isAuthenticated()) {
-					Changes are saved automatically and follow your account to every device.
-				} @else {
-					Changes are saved automatically on {{ platform.device }}. Sign in to use them on other devices.
-				}
+				Changes are saved automatically on {{ platform.device }}.
 			</info-note>
 		</div>
 
@@ -49,14 +45,8 @@
 				@case ('hotkeys') {
 					<settings-hotkeys></settings-hotkeys>
 				}
-				@case ('account') {
-					<settings-account></settings-account>
-				}
 				@case ('desktop') {
 					<settings-desktop></settings-desktop>
-				}
-				@case ('supporter') {
-					<settings-supporter></settings-supporter>
 				}
 			}
 		</div>

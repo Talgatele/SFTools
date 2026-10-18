@@ -1,1 +1,1 @@
-export type ProductionRequestMode = 'rate' | 'maximise';
+export type ProductionRequestMode = 'rate' | 'maximise' | 'satisfactory';

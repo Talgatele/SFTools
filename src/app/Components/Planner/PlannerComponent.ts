@@ -90,7 +90,6 @@ import {SubplanScaler} from '@src/Model/Planner/SubplanScaler';
 import {NotificationService} from '@src/Model/NotificationService';
 import {ProductionSolverService} from '@src/Model/Planner/ProductionSolverService';
 import {RateFormatter} from '@src/Model/RateFormatter';
-import {SignInPromptService} from '@src/Model/Auth/SignInPromptService';
 import {SettingsManager} from '@src/Model/Settings/SettingsManager';
 import {ActiveShareManager} from '@src/Model/Shares/ActiveShareManager';
 import {PageMetaService} from '@src/Model/Meta/PageMetaService';
@@ -188,7 +187,6 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 		public readonly shareDialog: ShareDialogService,
 		public readonly exportDialog: GraphExportDialogService,
 		private readonly folderRecalculation: FolderRecalculationService,
-		private readonly signInPrompt: SignInPromptService,
 		private readonly oldToolsImports: OldToolsImportRequestService,
 		private readonly oldToolsShares: OldToolsShareService,
 		private readonly oldToolsAutoImport: OldToolsAutoImportService,
@@ -199,13 +197,6 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 		private readonly router: Router,
 	)
 	{
-		// A plan id that isn't the user's own may be someone else's plan link; the URL → state sync prompts if it turns out to be theirs.
-		const planIdParam = route.snapshot.paramMap.get('planId');
-		const ownPlan = planIdParam === null || planManager.plans().some(p => p.id === planIdParam);
-		if (route.snapshot.paramMap.get('shareId') === null && ownPlan) {
-			signInPrompt.maybePrompt();
-		}
-
 		panelLayout.register({
 			id: 'plans',
 			helpTopic: 'panel.plans',
@@ -527,7 +518,6 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 				if (plans.some(p => p.id === planId)) {
 					this.urlAppliedPlanId = planId;
 					this.planManager.setActivePlan(planId);
-					this.signInPrompt.maybePrompt();
 					return;
 				}
 				// Must be the version-scoped flag - from a version-less page the store is "loaded" while still empty.

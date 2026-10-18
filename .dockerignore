@@ -1,0 +1,9 @@
+.git
+.angular
+coverage
+desktop
+dist
+node_modules
+out-tsc
+tmp
+npm-debug.log*

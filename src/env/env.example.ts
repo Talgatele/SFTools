@@ -3,9 +3,4 @@ export const env = {
 	webUrl: 'https://www.satisfactorytools.com',
 	apiUrl: 'https://api.new.satisfactorytools.com',
 	desktopAppPublic: true,
-	matomo: {
-		url: null,
-		siteId: null,
-		platformDimensionId: null,
-	},
 };

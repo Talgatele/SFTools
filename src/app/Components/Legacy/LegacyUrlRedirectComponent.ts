@@ -3,7 +3,6 @@ import {toObservable} from '@angular/core/rxjs-interop';
 import {ActivatedRoute, Params, Router, UrlSegment} from '@angular/router';
 import {Subscription, of} from 'rxjs';
 import {filter, take, timeout} from 'rxjs/operators';
-import {AnalyticsService} from '@src/Model/Analytics/AnalyticsService';
 import {Data} from '@src/Model/Data/Data';
 import {VersionManager} from '@src/Model/Data/VersionManager';
 import {OldGameVersion} from '@src/Model/OldTools/OldGameVersion';
@@ -34,7 +33,6 @@ export class LegacyUrlRedirectComponent implements OnDestroy
 		private readonly router: Router,
 		private readonly versionManager: VersionManager,
 		private readonly shareService: OldToolsShareService,
-		private readonly analytics: AnalyticsService,
 		private readonly injector: Injector,
 	)
 	{
@@ -52,8 +50,6 @@ export class LegacyUrlRedirectComponent implements OnDestroy
 
 	private redirect(oldVersion: OldGameVersion | null, path: string[], query: Params): void
 	{
-		this.analytics.trackEvent('OldTools', 'legacy-url', [oldVersion ?? '', ...path].join('/'));
-
 		const version = this.versionManager.defaultPublicVersion(oldVersion === '1.0-ficsmas');
 		if (version === null) {
 			this.go(['/']);

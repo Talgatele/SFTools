@@ -1,7 +1,6 @@
 import {Component, ChangeDetectionStrategy} from '@angular/core';
 import {DatePipe} from '@angular/common';
-import {FormsModule} from '@angular/forms';
-import {Router, RouterLink} from '@angular/router';
+import {RouterLink} from '@angular/router';
 import {ModsApiService} from '@src/Model/API/ModsApiService';
 import {Mod} from '@src/Model/API/Schema/Mods/Mod';
 import {BackLinkComponent} from '@src/Components/Common/BackLinkComponent';
@@ -10,7 +9,7 @@ import {HelpButtonComponent} from '@src/Components/Help/HelpButtonComponent';
 @Component({
 	templateUrl: './ModListComponent.html',
 	changeDetection: ChangeDetectionStrategy.Eager,
-	imports: [DatePipe, FormsModule, RouterLink, BackLinkComponent, HelpButtonComponent],
+	imports: [DatePipe, RouterLink, BackLinkComponent, HelpButtonComponent],
 })
 export class ModListComponent
 {
@@ -20,13 +19,8 @@ export class ModListComponent
 	public loading = true;
 	public loadError: string | null = null;
 
-	public newName = '';
-	public creating = false;
-	public createError: string | null = null;
-
 	public constructor(
 		private readonly modsApi: ModsApiService,
-		private readonly router: Router,
 	)
 	{
 		this.modsApi.listMods().subscribe({
@@ -41,32 +35,9 @@ export class ModListComponent
 		});
 	}
 
-	public get ownMods(): Mod[]
-	{
-		return this.mods.filter(mod => mod.owned);
-	}
-
 	public get publicMods(): Mod[]
 	{
-		return this.mods.filter(mod => !mod.owned);
-	}
-
-	public create(): void
-	{
-		const name = this.newName.trim();
-		if (name === '' || this.creating) {
-			this.createError = name === '' ? 'Enter a mod name first.' : null;
-			return;
-		}
-		this.creating = true;
-		this.createError = null;
-		this.modsApi.createMod(name).subscribe({
-			next: mod => void this.router.navigate(['/mods', mod.id]),
-			error: (err: {error?: {error?: string}}) => {
-				this.creating = false;
-				this.createError = err?.error?.error ?? 'Could not create the mod.';
-			},
-		});
+		return this.mods.filter(mod => mod.public);
 	}
 
 }

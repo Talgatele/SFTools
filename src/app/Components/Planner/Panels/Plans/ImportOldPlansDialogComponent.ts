@@ -16,7 +16,6 @@ import {OldToolsImportRequest} from '@src/Model/OldTools/OldToolsImportRequest';
 import {OldToolsLocalStorageService} from '@src/Model/OldTools/OldToolsLocalStorageService';
 import {OldToolsShareService} from '@src/Model/OldTools/OldToolsShareService';
 import {SftFileParser} from '@src/Model/OldTools/SftFileParser';
-import {AnalyticsService} from '@src/Model/Analytics/AnalyticsService';
 import {Version} from '@src/Model/API/Schema/Version';
 import {Plan} from '@src/Model/Planner/Plan';
 import {PlanIconResolver} from '@src/Model/Planner/PlanIconResolver';
@@ -107,7 +106,6 @@ export class ImportOldPlansDialogComponent implements OnInit, OnDestroy
 		private readonly versionManager: VersionManager,
 		private readonly planIcons: PlanIconResolver,
 		private readonly localStorageLines: OldToolsLocalStorageService,
-		private readonly analytics: AnalyticsService,
 	)
 	{
 		this.ficsmas = versionManager.activeVersion()?.ficsmas ?? false;
@@ -154,7 +152,6 @@ export class ImportOldPlansDialogComponent implements OnInit, OnDestroy
 		const lines = this.localStorageLines.readFlavour(this.ficsmas);
 		this.localCountSignal.set(0);
 		lines.forEach(line => this.addProductionLine(line.data, line.gameVersion));
-		this.analytics.trackEvent('OldTools', 'load-local-lines', undefined, lines.length);
 	}
 
 	private loadShareKeys(keys: string[], sourceVersion: OldGameVersion | null): void
@@ -238,7 +235,6 @@ export class ImportOldPlansDialogComponent implements OnInit, OnDestroy
 			plans.push(data === null ? row.plan : (await this.importer.withGraph(row.plan, row.source, row.sourceVersion, data)).plan);
 		}
 		this.importProgressSignal.set(null);
-		this.analytics.trackEvent('OldTools', 'import-plans', undefined, plans.length);
 		this.apply.emit(plans);
 	}
 

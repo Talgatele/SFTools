@@ -106,11 +106,9 @@
 							{{ modsFailed ? 'The mod list could not be loaded. Reload the page to try again.' : 'No mods available.' }}
 						</div>
 					}
-					@if (!auth.isAuthenticated()) {
-						<info-note>
-							Only public mods are shown. <a routerLink="/auth/login" [queryParams]="{returnUrl: '/create-version'}">sign in</a> to create and use your own.
-						</info-note>
-					}
+					<info-note>
+						Only public mods are listed here. Use the <a routerLink="/mod-editor">Mod editor</a> to create local mod data.
+					</info-note>
 				</div>
 			</div>
 

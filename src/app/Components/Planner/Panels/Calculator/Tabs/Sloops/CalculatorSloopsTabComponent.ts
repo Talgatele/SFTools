@@ -63,7 +63,7 @@ export class CalculatorSloopsTabComponent
 
 	public get hasMaximiseRequest(): boolean
 	{
-		return this.planManager.activePlan()?.requests.some(request => request.mode === 'maximise') ?? false;
+		return this.planManager.activePlan()?.requests.some(request => request.mode === 'maximise' || request.mode === 'satisfactory') ?? false;
 	}
 
 	public setMaxSloops(value: number): void

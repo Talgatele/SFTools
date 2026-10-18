@@ -1,5 +1,4 @@
 import {Injectable, effect, signal, untracked} from '@angular/core';
-import {AnalyticsService} from '@src/Model/Analytics/AnalyticsService';
 import {Data} from '@src/Model/Data/Data';
 import {VersionManager} from '@src/Model/Data/VersionManager';
 import {OldLocalProductionLine} from '@src/Model/OldTools/OldLocalProductionLine';
@@ -22,7 +21,6 @@ export class OldToolsAutoImportService
 		private readonly planManager: PlanManager,
 		private readonly localLines: OldToolsLocalStorageService,
 		private readonly importer: OldPlanImporter,
-		private readonly analytics: AnalyticsService,
 	)
 	{
 		effect(() => {
@@ -70,7 +68,6 @@ export class OldToolsAutoImportService
 		// Remembered even when nothing could be converted: the lines will not
 		// convert better next time, and the dialog can still load them by hand.
 		this.localLines.markCopied(ficsmas);
-		this.analytics.trackEvent('OldTools', 'auto-copy', undefined, plans.length);
 	}
 
 	private async prepare(line: OldLocalProductionLine, data: Data)

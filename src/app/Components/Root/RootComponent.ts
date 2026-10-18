@@ -6,7 +6,6 @@ import {HelpImageViewerComponent} from '@src/Components/Help/HelpImageViewerComp
 import {DesktopUpdateBannerComponent} from '@src/Components/Root/DesktopUpdateBannerComponent';
 import {OpenInDesktopComponent} from '@src/Components/Root/OpenInDesktopComponent';
 import {ServerStatusService} from '@src/Model/API/ServerStatusService';
-import {AnalyticsService} from '@src/Model/Analytics/AnalyticsService';
 import {DesktopIntegrationService} from '@src/Model/Desktop/DesktopIntegrationService';
 import {ConnectivityService} from '@src/Model/Network/ConnectivityService';
 import {HotkeyService} from '@src/Model/Hotkeys/HotkeyService';
@@ -32,8 +31,6 @@ export class RootComponent
     public constructor(
         public readonly serverStatus: ServerStatusService,
         private readonly hotkeys: HotkeyService,
-        // Injected for its side effect: it starts listening to the router here, so every navigation is counted.
-        analytics: AnalyticsService,
         public readonly connectivity: ConnectivityService,
         desktopIntegration: DesktopIntegrationService,
         pageScrollbar: PageScrollbarService,

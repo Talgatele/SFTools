@@ -6,5 +6,6 @@ export interface MaximiseTarget
 
 	category: MaximiseCategory;
 	items: Item[];
+	satisfactory: boolean;
 
 }

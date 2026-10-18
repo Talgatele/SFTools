@@ -109,6 +109,11 @@ export class CalculatorProductionTabComponent implements OnDestroy
 		return row.mode ?? 'rate';
 	}
 
+	public get hasSatisfactoryMode(): boolean
+	{
+		return this.rows.some(row => this.modeOf(row) === 'satisfactory');
+	}
+
 	/** Omitting the default keeps requests saved before maximise existed byte-identical. */
 	public setMode(row: ProductionRequest, mode: ProductionRequestMode): void
 	{
@@ -131,13 +136,13 @@ export class CalculatorProductionTabComponent implements OnDestroy
 
 	public powerSelectionOf(row: ProductionRequest): string
 	{
-		return this.modeOf(row) === 'maximise' ? 'maximise' : row.powerUnit ?? 'MW';
+		return this.modeOf(row) !== 'rate' ? this.modeOf(row) : row.powerUnit ?? 'MW';
 	}
 
 	public setPowerSelection(row: ProductionRequest, selection: string): void
 	{
-		if (selection === 'maximise') {
-			this.setMode(row, 'maximise');
+		if (selection === 'maximise' || selection === 'satisfactory') {
+			this.setMode(row, selection);
 			return;
 		}
 		row.mode = undefined;
@@ -155,10 +160,13 @@ export class CalculatorProductionTabComponent implements OnDestroy
 		}
 	}
 
-	public maximiseDisabled(row: ProductionRequest): boolean
+	public maximiseDisabled(row: ProductionRequest, mode: 'maximise' | 'satisfactory' = 'maximise'): boolean
 	{
-		const active = this.maximisedCategory();
-		return active !== null && active !== this.categoryOf(row.itemClassName) && this.modeOf(row) !== 'maximise';
+		const active = this.rows.find(other => other !== row
+			&& this.modeOf(other) !== 'rate'
+			&& other.itemClassName !== '');
+		return active !== undefined
+			&& (this.modeOf(active) !== mode || this.categoryOf(active.itemClassName) !== this.categoryOf(row.itemClassName));
 	}
 
 	public achievedFor(row: ProductionRequest): string | null
@@ -179,14 +187,8 @@ export class CalculatorProductionTabComponent implements OnDestroy
 
 	public get showSloopWarning(): boolean
 	{
-		return this.rows.some(row => this.modeOf(row) === 'maximise')
+		return this.rows.some(row => this.modeOf(row) !== 'rate')
 			&& (this.planManager.activeSettings()?.maxSloops ?? 0) > 0;
-	}
-
-	private maximisedCategory(): MaximiseCategory | null
-	{
-		const row = this.rows.find(r => this.modeOf(r) === 'maximise' && r.itemClassName !== '');
-		return row === undefined ? null : this.categoryOf(row.itemClassName);
 	}
 
 	private categoryOf(itemClassName: string): MaximiseCategory

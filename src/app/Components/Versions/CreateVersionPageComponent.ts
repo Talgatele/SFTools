@@ -20,7 +20,6 @@ import {WorldDataMode} from '@src/Model/API/Schema/World/WorldDataMode';
 import {WorldDataPayload} from '@src/Model/API/Schema/World/WorldDataPayload';
 import {WorldDataPurity} from '@src/Model/API/Schema/World/WorldDataPurity';
 import {VersionsApiService} from '@src/Model/API/VersionsApiService';
-import {AuthService} from '@src/Model/Auth/AuthService';
 import {Data} from '@src/Model/Data/Data';
 import {DataTransformer} from '@src/Model/Data/DataTransformer';
 import {VersionManager} from '@src/Model/Data/VersionManager';
@@ -170,7 +169,6 @@ export class CreateVersionPageComponent
 	public constructor(
 		private readonly api: VersionsApiService,
 		private readonly modsApi: ModsApiService,
-		protected readonly auth: AuthService,
 		protected readonly versionManager: VersionManager,
 		private readonly transformer: DataTransformer,
 		private readonly limitsCalculator: WorldLimitsCalculator,

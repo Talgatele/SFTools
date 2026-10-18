@@ -1,5 +1,5 @@
 import {Injectable} from '@angular/core';
-import {map, Observable, of} from 'rxjs';
+import {firstValueFrom, map, Observable, of} from 'rxjs';
 import {Data} from '@src/Model/Data/Data';
 import {Recipe} from '@src/Model/Data/Entities/Recipe';
 import {VersionManager} from '@src/Model/Data/VersionManager';
@@ -142,10 +142,26 @@ export class ProductionSolverService
 		};
 	}
 
+	private cleanProductionRate(maximum: number): number
+	{
+		const whole = Math.floor(maximum + 1e-5);
+		if (whole > 0 && maximum - whole <= 0.25) {
+			return whole;
+		}
+
+		const half = Math.floor((maximum + 1e-5) * 2) / 2;
+		if (half > 0 && maximum - half <= 0.1) {
+			return half;
+		}
+
+		const tenth = Math.floor((maximum + 1e-5) * 10) / 10;
+		return tenth > 0 ? tenth : maximum;
+	}
+
 	/** The UI enforces a single maximised category, but synced data may not. */
 	private maximiseTarget(plan: Plan, data: Data): MaximiseTarget | null
 	{
-		const rows = plan.requests.filter(request => request.mode === 'maximise' && request.itemClassName !== '');
+		const rows = plan.requests.filter(request => request.mode !== undefined && request.mode !== 'rate' && request.itemClassName !== '');
 		if (rows.length === 0) {
 			return null;
 		}
@@ -157,7 +173,7 @@ export class ProductionSolverService
 		const items = category !== 'items' ? [] : [...new Set(rows.map(row => row.itemClassName))]
 			.map(className => data.searchItemByClassName(className))
 			.filter((item): item is Item => item !== undefined);
-		return {category, items};
+		return {category, items, satisfactory: rows.some(row => row.mode === 'satisfactory')};
 	}
 
 	private categoryOf(itemClassName: string): MaximiseCategory
@@ -909,7 +925,7 @@ export class ProductionSolverService
 			};
 			const roundLocked = first ? lockedNodes : [];
 
-			const maxRequest: SolverRequest = {...roundBase, maximise: {category: maximise.category, items}};
+			const maxRequest: SolverRequest = {...roundBase, maximise: {category: maximise.category, items, satisfactory: maximise.satisfactory}};
 			const maxSolution = await this.awaitSolve(this.buildLp(maxRequest, data, roundLocked), this.solveOptions(maxRequest, plan), run);
 			const maxStatus = this.mapStatus(maxSolution.Status);
 			if (maxStatus === 'Unbounded') {
@@ -970,6 +986,39 @@ export class ProductionSolverService
 		}
 
 		this.netCarries(merged);
+		if (maximise.satisfactory) {
+			// Rebuild at clean rates instead of merely rounding the displayed maximum.
+			// Only satisfactory rows are converted: a mixed plan may still contain
+			// ordinary maximise rows, which must remain maximised by the follow-up solve.
+			const satisfactoryMaximums = Object.fromEntries(
+				plan.requests
+					.filter(request => request.mode === 'satisfactory' && request.itemClassName !== '')
+					.map(request => request.itemClassName)
+					.filter((itemClassName, index, requests) => requests.indexOf(itemClassName) === index)
+					.map(itemClassName => [itemClassName, this.cleanProductionRate(achieved[itemClassName] ?? 0)]),
+			);
+			const fixedPlan: Plan = {
+				...plan,
+				requests: plan.requests.map(request => {
+					if (request.mode !== 'satisfactory' || request.itemClassName === '') {
+						return request;
+					}
+					const rate = satisfactoryMaximums[request.itemClassName];
+					return rate === undefined ? request : {...request, mode: 'rate', ratePerMinute: rate};
+				}),
+			};
+			const fixedResponse = await firstValueFrom(this.solve(fixedPlan, lockedNodes));
+			if (fixedResponse.status !== 'Optimal') {
+				return {...fixedResponse, achievedMaximums: satisfactoryMaximums};
+			}
+			return {
+				...fixedResponse,
+				achievedMaximums: {
+					...fixedResponse.achievedMaximums,
+					...satisfactoryMaximums,
+				},
+			};
+		}
 		return {
 			status: 'Optimal',
 			nodes: [
@@ -985,7 +1034,7 @@ export class ProductionSolverService
 	{
 		const producible: Item[] = [];
 		for (const item of items) {
-			const request: SolverRequest = {...probeBase, maximise: {category: 'items', items: [item]}};
+			const request: SolverRequest = {...probeBase, maximise: {category: 'items', items: [item], satisfactory: false}};
 			const solution = await this.awaitSolve(this.buildLp(request, data, []), {}, run);
 			if (this.mapStatus(solution.Status) === 'Optimal'
 				&& (this.columnsOf(solution).get('MaxRate') ?? 0) >= ProductionSolverService.MAXIMISE_EPSILON) {

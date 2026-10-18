@@ -71,7 +71,9 @@ export class OldPlanConverter
 			requests.push({
 				itemClassName: row.item,
 				ratePerMinute: typeof row.amount === 'number' ? row.amount : 0,
-				...(row.type === 'max' ? {mode: 'maximise' as const} : {}),
+				...(row.type === 'max'
+					? {mode: 'maximise' as const}
+					: row.type === 'satisfactory' ? {mode: 'satisfactory' as const} : {}),
 			});
 		}
 
