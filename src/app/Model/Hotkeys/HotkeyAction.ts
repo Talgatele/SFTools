@@ -30,6 +30,7 @@ export type HotkeyAction =
 	| 'planner.zoomFit'
 	| 'planner.export'
 	| 'calculator.request'
+	| 'calculator.graph'
 	| 'calculator.resources'
 	| 'calculator.recipes'
 	| 'calculator.machines'

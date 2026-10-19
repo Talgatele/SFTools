@@ -29,6 +29,8 @@ import {CalculatorResourcesTabComponent} from '@src/Components/Planner/Panels/Ca
 import {CalculatorSinkTabComponent} from '@src/Components/Planner/Panels/Calculator/Tabs/Sink/CalculatorSinkTabComponent';
 import {CalculatorSloopsTabComponent} from '@src/Components/Planner/Panels/Calculator/Tabs/Sloops/CalculatorSloopsTabComponent';
 import {PlannerActionsService} from '@src/Components/Planner/PlannerActionsService';
+import {PlannerGraphService} from '@src/Components/Planner/PlannerGraphService';
+import {PanelLayoutService} from '@src/Components/Planner/Panel/PanelLayoutService';
 import {CalculatorTabHotkeys} from '@src/Components/Planner/Panels/Calculator/CalculatorTabHotkeys';
 import {HotkeyService} from '@src/Model/Hotkeys/HotkeyService';
 import {NotificationService} from '@src/Model/NotificationService';
@@ -52,6 +54,7 @@ import {CalculatorQuickStartComponent} from '@src/Components/Planner/Panels/Calc
 	selector: 'planner-calculator',
 	templateUrl: './CalculatorComponent.html',
 	changeDetection: ChangeDetectionStrategy.Eager,
+	host: {'[class.graph-tab-active]': 'graphTabActive()'},
 	imports: [CalculatorQuickStartComponent,
 		BsDropdownModule,
 		DatePipe,
@@ -91,6 +94,9 @@ import {CalculatorQuickStartComponent} from '@src/Components/Planner/Panels/Calc
 		}
 		.calc-tabs-wrap {
 			padding: 8px 10px 0;
+		}
+		:host(.graph-tab-active) .calc-tabs-wrap {
+			pointer-events: auto;
 		}
 		.calc-tabs {
 			--bs-nav-tabs-border-color: #6a7d91;
@@ -193,6 +199,7 @@ export class CalculatorComponent implements OnDestroy
 	public readonly faEllipsis = faEllipsis;
 
 	public readonly activeTab: Signal<CalculatorTab>;
+	public readonly graphTabActive: Signal<boolean>;
 
 	public readonly badges: Signal<ReadonlyMap<CalculatorTab, string | null>>;
 
@@ -261,13 +268,15 @@ export class CalculatorComponent implements OnDestroy
 		private readonly badgeResolver: CalculatorTabBadgeResolver,
 		private readonly versionManager: VersionManager,
 		private readonly settingsManager: SettingsManager,
+		private readonly panelLayout: PanelLayoutService,
+		private readonly plannerGraph: PlannerGraphService,
 	)
 	{
 		this.activeTab = tabState.activeTab;
 		// Reading the preference here re-runs updateTabsMode on a change even when nothing resized.
 		this.moreTabs = computed(() => {
 			const planner = this.settingsManager.planner();
-			return planner.groupTabs ? this.tabs.filter(tab => planner.moreTabs.includes(tab.id)) : [];
+			return planner.groupTabs ? this.tabs.filter(tab => tab.id !== 'graph' && planner.moreTabs.includes(tab.id)) : [];
 		});
 		this.mainTabs = computed(() => this.tabs.filter(tab => !this.moreTabs().includes(tab)));
 		this.moreTabActive = computed(() => this.moreTabs().some(tab => tab.id === this.activeTab()));
@@ -332,6 +341,18 @@ export class CalculatorComponent implements OnDestroy
 			}
 		});
 		this.hasGraph = computed(() => (this.activePlan()?.graph?.nodes.length ?? 0) > 0);
+		this.graphTabActive = computed(() => this.activeTab() === 'graph'
+			&& (this.activePlan() !== null || this.activeFolder() !== null)
+			&& this.activeShare.payload() === null
+			&& this.planLink.payload() === null
+			&& !this.activePlanLocal());
+		effect(() => {
+			const active = this.graphTabActive();
+			this.panelLayout.setGraphView(active);
+			if (active) {
+				this.plannerGraph.zoomFit();
+			}
+		});
 		this.calculateHint = computed(() => this.graphDirty()
 			? 'Build the graph again. Only locked nodes keep your hand edits.'
 			: this.modeOptions.find(option => option.mode === this.mode())?.description ?? '');
@@ -375,6 +396,7 @@ export class CalculatorComponent implements OnDestroy
 	public ngOnDestroy(): void
 	{
 		this.tabsResizeObserver?.disconnect();
+		this.panelLayout.setGraphView(false);
 	}
 
 	private observeTabs(): void
@@ -426,6 +448,7 @@ export class CalculatorComponent implements OnDestroy
 		sloops: 'request.sloops',
 		overclocking: 'request.overclocking',
 		optimisation: 'request.optimisation',
+		graph: 'planner.graph',
 	};
 
 	public activeTabHelpTopic(): HelpTopicId

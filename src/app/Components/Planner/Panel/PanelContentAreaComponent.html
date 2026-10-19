@@ -62,5 +62,6 @@
 
 <div
 	[class]="'resize-handle ' + handleClass + (isResizing ? ' resizing' : '')"
+	[hidden]="side === 'top' && activePanel?.id === 'calculator'"
 	(pointerdown)="onResizeStart($event)"
 ></div>

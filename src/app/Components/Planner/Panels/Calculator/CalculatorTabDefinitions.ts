@@ -1,4 +1,4 @@
-import {faBolt, faGaugeHigh, faIndustry, faListCheck, faMountain, faRecycle, faRightFromBracket, faRightToBracket, faScroll, faSliders, faWandMagicSparkles} from '@fortawesome/free-solid-svg-icons';
+import {faBolt, faDiagramProject, faGaugeHigh, faIndustry, faListCheck, faMountain, faRecycle, faRightFromBracket, faRightToBracket, faScroll, faSliders, faWandMagicSparkles} from '@fortawesome/free-solid-svg-icons';
 import {CalculatorTab} from '@src/Components/Planner/Panels/Calculator/CalculatorTab';
 import {CalculatorTabDefinition} from '@src/Components/Planner/Panels/Calculator/CalculatorTabDefinition';
 
@@ -8,6 +8,7 @@ export class CalculatorTabDefinitions
 
 	public static readonly ALL: readonly CalculatorTabDefinition[] = [
 		{id: 'request', label: 'Request', icon: faListCheck},
+		{id: 'graph', label: 'Graph', icon: faDiagramProject},
 		{id: 'resources', label: 'Resources', icon: faMountain},
 		{id: 'recipes', label: 'Recipes', icon: faScroll},
 		{id: 'machines', label: 'Machines', icon: faIndustry},

@@ -1,4 +1,4 @@
-import {Component, OnDestroy, ChangeDetectionStrategy} from '@angular/core';
+import {Component, OnDestroy, ChangeDetectionStrategy, QueryList, ViewChildren} from '@angular/core';
 import {toObservable} from '@angular/core/rxjs-interop';
 import {Subscription} from 'rxjs';
 import {FormsModule} from '@angular/forms';
@@ -33,6 +33,7 @@ export class CalculatorProductionTabComponent implements OnDestroy
 	public readonly sinkPointsTargetClass = SpecialClasses.SinkPointsTarget;
 
 	public rows: ProductionRequest[] = [];
+	@ViewChildren(ItemPickerComponent) private itemPickers?: QueryList<ItemPickerComponent>;
 
 	private loadedPlanId: string | null = null;
 	private loadedRequests: string | null = null;
@@ -220,6 +221,8 @@ export class CalculatorProductionTabComponent implements OnDestroy
 	{
 		this.rows.push(this.blankRow());
 		this.sync();
+		// Wait for Angular to create the new picker before opening it.
+		setTimeout(() => this.itemPickers?.last?.open());
 	}
 
 	public removeRow(index: number): void

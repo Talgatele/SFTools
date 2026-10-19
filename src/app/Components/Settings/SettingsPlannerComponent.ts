@@ -132,7 +132,7 @@ export class SettingsPlannerComponent
 
 	public isMainTab(tab: CalculatorTab): boolean
 	{
-		return !this.settings.planner().moreTabs.includes(tab);
+		return tab === 'graph' || !this.settings.planner().moreTabs.includes(tab);
 	}
 
 	/** The strip always keeps at least one tab of its own next to More. */
@@ -143,6 +143,9 @@ export class SettingsPlannerComponent
 
 	public setMainTab(tab: CalculatorTab, main: boolean): void
 	{
+		if (tab === 'graph') {
+			return;
+		}
 		const moreTabs = this.settings.planner().moreTabs.filter(id => id !== tab);
 		this.settings.updatePlanner({moreTabs: main ? moreTabs : [...moreTabs, tab]});
 	}

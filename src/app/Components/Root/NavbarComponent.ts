@@ -30,6 +30,15 @@ import {BackToPlannerResolver} from '@src/Model/Planner/BackToPlannerResolver';
 		AppTooltipDirective,
 	],
 	styles: `
+		.navbar {
+			min-height: 38px;
+			padding-top: 0.1875rem;
+			padding-bottom: 0.1875rem;
+		}
+		.navbar-nav .nav-link {
+			padding-top: 0.25rem;
+			padding-bottom: 0.25rem;
+		}
 		.navbar-shortcut,
 		.navbar-toggler {
 			--bs-btn-color: #fff;

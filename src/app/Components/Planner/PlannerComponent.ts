@@ -126,7 +126,7 @@ const RATIO_TOLERANCE = 1e-4;
 		{provide: CodexNavigation, useClass: PanelCodexNavigation},
 	],
 	changeDetection: ChangeDetectionStrategy.Eager,
-	host: {style: 'position: fixed; top: 56px; left: 0; right: 0; bottom: 0; overflow: hidden;'},
+	host: {style: 'position: fixed; top: 40px; left: 0; right: 0; bottom: 0; overflow: hidden;'},
 })
 export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSource
 {
@@ -170,7 +170,7 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 		private readonly nodeSplitter: NodeSplitter,
 		private readonly edgeBuilder: GraphEdgeBuilder,
 		private readonly plannerGraph: PlannerGraphService,
-		private readonly panelLayout: PanelLayoutService,
+		public readonly panelLayout: PanelLayoutService,
 		private readonly actions: PlannerActionsService,
 		private readonly history: GraphHistoryService,
 		private readonly contextMenu: PlannerContextMenuService,

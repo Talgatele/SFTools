@@ -52,7 +52,19 @@ export class PanelLayoutService implements OnDestroy
 	private readonly sizesSignal = signal<Record<PanelSide, number>>({
 		left: 320, right: 320, top: 340,
 	});
-	public readonly sizes = this.sizesSignal.asReadonly();
+	private readonly graphViewSignal = signal(false);
+	private readonly availableHeightSignal = signal<number | null>(null);
+	public readonly graphViewActive = this.graphViewSignal.asReadonly();
+	public readonly sizes = computed(() => {
+		const sizes = this.sizesSignal();
+		if (this.activeTabIdsSignal().top !== 'calculator') {
+			return sizes;
+		}
+		const top = this.graphViewSignal()
+			? MIN_SIZE
+			: (this.availableHeightSignal() ?? sizes.top);
+		return {...sizes, top};
+	});
 
 	private readonly dockPreviewSignal = signal<PanelSide | null>(null);
 	public readonly dockPreview = this.dockPreviewSignal.asReadonly();
@@ -79,7 +91,7 @@ export class PanelLayoutService implements OnDestroy
 
 	public readonly canvasInsets = computed<CanvasInsets>(() => {
 		if (this.mobileSignal()) {
-			return {left: 0, right: 0, top: 0, bottom: MOBILE_NAV_HEIGHT};
+			return {left: 0, right: 0, top: this.graphViewSignal() ? 88 : 0, bottom: MOBILE_NAV_HEIGHT};
 		}
 		const sizes = this.sizes();
 		return {
@@ -111,6 +123,12 @@ export class PanelLayoutService implements OnDestroy
 	public setMobile(mobile: boolean): void
 	{
 		this.mobileSignal.set(mobile);
+	}
+
+	/** Give the graph the planner canvas while keeping the calculator tabs available. */
+	public setGraphView(active: boolean): void
+	{
+		this.graphViewSignal.set(active);
 	}
 
 	public snapshot(): PanelLayoutState
@@ -517,6 +535,7 @@ export class PanelLayoutService implements OnDestroy
 	{
 		this.availableWidth = width;
 		this.availableHeight = height;
+		this.availableHeightSignal.set(height);
 		this.originX = originX;
 		this.originY = originY;
 

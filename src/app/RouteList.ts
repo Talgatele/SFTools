@@ -15,6 +15,7 @@ import {PlannerComponent} from '@src/Components/Planner/PlannerComponent';
 import {SettingsComponent} from '@src/Components/Settings/SettingsComponent';
 import {ShareRedirectComponent} from '@src/Components/Shares/ShareRedirectComponent';
 import {HelpEditorGuard} from '@src/Model/Help/HelpEditorGuard';
+import {HomeRedirectGuard} from '@src/Model/Planner/HomeRedirectGuard';
 import {NotFoundComponent} from '@src/Components/Errors/NotFoundComponent';
 import {LegacyUrlRedirectComponent} from '@src/Components/Legacy/LegacyUrlRedirectComponent';
 import {VersionsResolver} from '@src/Model/Data/VersionsResolver';
@@ -84,6 +85,7 @@ export class RouteList
 				{
 					path: '',
 					component: HomeComponent,
+					canActivate: [HomeRedirectGuard],
 				},
 				{
 					path: 'settings',

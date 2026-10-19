@@ -2,6 +2,8 @@
 <div
 	#graphContainer
 	style="position: absolute; inset: 0; user-select: none;"
+	[style.visibility]="panelLayout.graphViewActive() ? 'visible' : 'hidden'"
+	[style.pointer-events]="panelLayout.graphViewActive() ? 'auto' : 'none'"
 	(contextmenu)="$event.preventDefault()"
 	(dragstart)="$event.preventDefault()"
 ></div>

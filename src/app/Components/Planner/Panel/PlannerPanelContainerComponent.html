@@ -6,7 +6,7 @@
 			<span class="mob-head-title"><fa-icon [icon]="panel.icon" class="me-2 opacity-75"></fa-icon>{{ panel.label }}</span>
 			<button class="mob-head-btn" type="button" aria-label="Close panel" (click)="layout.setMobilePanel(null)"><fa-icon [icon]="faXmark"></fa-icon></button>
 		</div>
-		<div class="mob-view">
+		<div class="mob-view" [class.graph-canvas-view]="layout.graphViewActive()">
 			<ng-container [ngComponentOutlet]="panel.component"></ng-container>
 		</div>
 	} @else {
@@ -14,7 +14,7 @@
 		@if (shareDialog.activeTarget() !== null) {
 			<button class="mob-share-btn" type="button" aria-label="Share" (click)="shareDialog.openActive()"><fa-icon [icon]="faShareNodes"></fa-icon></button>
 		}
-		<div class="mob-zoom">
+		<div class="mob-zoom" [style.visibility]="layout.graphViewActive() ? 'visible' : 'hidden'">
 			<planner-zoom-controls></planner-zoom-controls>
 		</div>
 	}

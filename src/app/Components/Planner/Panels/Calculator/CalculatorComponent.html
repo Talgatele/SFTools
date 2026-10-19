@@ -63,6 +63,7 @@
 
 } @else if (activePlan()) {
 
+	@if (!graphTabActive()) {
 	<div class="req-controls">
 		@if (!allGroupsFixed()) {
 			<!-- container="body": the panel's overflow container would clip the menu. -->
@@ -169,9 +170,11 @@
 			<button type="button" class="btn-close flex-shrink-0" aria-label="Dismiss" (click)="actions.setSolveError(null)"></button>
 		</div>
 	}
+	}
 
 	<ng-container *ngTemplateOutlet="tabStrip; context: {locks: true}"></ng-container>
 
+	@if (!graphTabActive()) {
 	@if (isFixedTab(activeTab()) && fixedFolder(); as folder) {
 		<div class="px-2 pt-2">
 			<info-note>
@@ -201,9 +204,11 @@
 			@case ('optimisation') { <calculator-optimisation-tab></calculator-optimisation-tab> }
 		}
 	</fieldset>
+	}
 
 } @else if (activeFolder(); as folder) {
 
+	@if (!graphTabActive()) {
 	@if (folderHasCustomSettings()) {
 		<div class="req-controls">
 			<div class="btn-group" dropdown container="body" placement="bottom left">
@@ -329,9 +334,11 @@
 			}
 		</div>
 	}
+	}
 
 	<ng-container *ngTemplateOutlet="tabStrip; context: {locks: false}"></ng-container>
 
+	@if (!graphTabActive()) {
 	@switch (activeTab()) {
 		@case ('request') {
 			<div class="p-2">
@@ -409,6 +416,7 @@
 				</div>
 			}
 		}
+	}
 	}
 
 } @else {

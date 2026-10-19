@@ -83,7 +83,7 @@
 							type="checkbox"
 							[id]="'main-tab-' + tab.id"
 							[ngModel]="isMainTab(tab.id)"
-							[disabled]="isLastMainTab(tab.id)"
+							[disabled]="tab.id === 'graph' || isLastMainTab(tab.id)"
 							(ngModelChange)="setMainTab(tab.id, $event)"
 						/>
 						<label class="form-check-label" [for]="'main-tab-' + tab.id">

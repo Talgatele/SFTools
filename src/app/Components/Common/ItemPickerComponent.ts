@@ -34,6 +34,7 @@ export class ItemPickerComponent
 	@Output() public valueChange = new EventEmitter<string>();
 
 	@ViewChild('searchInput') private searchInput?: ElementRef<HTMLInputElement>;
+	@ViewChild('dropdown') private dropdown?: BsDropdownDirective;
 
 	public search = '';
 
@@ -64,6 +65,11 @@ export class ItemPickerComponent
 	{
 		this.search = search;
 		this.highlighted = 0;
+	}
+
+	public open(): void
+	{
+		this.dropdown?.show();
 	}
 
 	/** Keyboard handling lives on the search box; the options are never focused, so the caret stays where the user types. */

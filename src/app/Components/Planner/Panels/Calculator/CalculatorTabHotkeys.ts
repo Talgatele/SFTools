@@ -8,6 +8,7 @@ export class CalculatorTabHotkeys
 	/** In tab order, which is also the order of the keys on the number row. */
 	public static readonly ENTRIES: {action: HotkeyAction; tab: CalculatorTab}[] = [
 		{action: 'calculator.request', tab: 'request'},
+		{action: 'calculator.graph', tab: 'graph'},
 		{action: 'calculator.resources', tab: 'resources'},
 		{action: 'calculator.recipes', tab: 'recipes'},
 		{action: 'calculator.machines', tab: 'machines'},

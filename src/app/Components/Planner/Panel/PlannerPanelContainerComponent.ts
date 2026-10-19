@@ -171,6 +171,11 @@ const MOBILE_BREAKPOINT = 768;
 			pointer-events: auto;
 			z-index: 9;
 		}
+		.mob-view.graph-canvas-view {
+			background: transparent;
+			pointer-events: none;
+			overflow: visible;
+		}
 		.mob-scrim {
 			position: absolute;
 			inset: 0;
@@ -357,14 +362,16 @@ export class PlannerPanelContainerComponent implements AfterViewInit, OnDestroy
 		const l = this.layout.railWidth() + (this.leftOpen() ? sizes.left : 0);
 		const r = this.rightOpen() ? sizes.right : 0;
 		const t = this.topOpen() ? sizes.top : 0;
-		return `position:absolute;left:${l}px;right:${r}px;top:${t}px;bottom:${STATUS}px;pointer-events:none;z-index:6;`;
+		const visibility = this.layout.graphViewActive() ? 'visible' : 'hidden';
+		return `position:absolute;left:${l}px;right:${r}px;top:${t}px;bottom:${STATUS}px;pointer-events:none;z-index:6;visibility:${visibility};`;
 	}
 
 	public get zoomStyle(): string
 	{
 		const sizes = this.layout.sizes();
 		const l = this.layout.railWidth() + (this.leftOpen() ? sizes.left : 0) + 12;
-		return `position:absolute;left:${l}px;bottom:${STATUS + 12}px;pointer-events:auto;z-index:7;`;
+		const visibility = this.layout.graphViewActive() ? 'visible' : 'hidden';
+		return `position:absolute;left:${l}px;bottom:${STATUS + 12}px;pointer-events:auto;z-index:7;visibility:${visibility};`;
 	}
 
 	public floatWrapStyle(group: FloatingGroup, stackIndex: number): string
