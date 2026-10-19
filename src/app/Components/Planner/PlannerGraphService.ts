@@ -96,7 +96,7 @@ const SUBPLAN_IO_TOP = 40;
 
 const NODE_STROKE_WIDTH = 1.5;
 // Dark fallbacks: x6's `rect` defaults (white body, black text) show whenever a per-node attr fails to apply.
-const NODE_FALLBACK_FILL = '#141c28';
+const NODE_FALLBACK_FILL = '#1e2d3b';
 const NODE_FALLBACK_STROKE = '#5c718a';
 const NODE_FALLBACK_TEXT = '#f4f7fb';
 const NODE_NAME_TEXT = '#ffffff';
@@ -148,6 +148,8 @@ const EDGE_STROKE_WIDTH = 1.5;
 const PARALLEL_EDGE_GAP = 40;
 const SELECTED_STROKE = '#f0ad4e';
 const EXPORT_MARGIN = 40;
+// Fitting a plan with one or a few nodes would otherwise blow them up to fill the canvas.
+const FIT_MAX_SCALE = 1;
 const EXPORT_SAMPLE_MARGIN = 12;
 const SELECTED_STROKE_WIDTH = 3;
 const SELECTED_EDGE_STROKE_WIDTH = 2.5;
@@ -205,7 +207,7 @@ const SELECTED_TOUCH_Z = 100003;
 
 const PORT_RADIUS = 8;
 const PORT_ICON_SIZE = 12;
-const PORT_FILL = '#141c28';
+const PORT_FILL = '#1e2d3b';
 const PORT_STROKE = '#8ea9c9';
 const CONNECT_SNAP_RADIUS = 30;
 
@@ -774,7 +776,7 @@ export class PlannerGraphService implements OnDestroy
 			top: insets.top + 40,
 			bottom: insets.bottom + 40,
 		};
-		x6Graph.zoomToFit({padding});
+		x6Graph.zoomToFit({padding, maxScale: FIT_MAX_SCALE});
 		x6Graph.translateBy((padding.left - padding.right) / 2, (padding.top - padding.bottom) / 2);
 	}
 
@@ -1061,7 +1063,7 @@ export class PlannerGraphService implements OnDestroy
 				removable: true,
 				attrs: {
 					r: 5,
-					fill: '#141c28',
+					fill: '#1e2d3b',
 					stroke: SELECTED_STROKE,
 					'stroke-width': 1.5,
 					// The move cursor is set while dragging, in styles.scss.
@@ -1924,7 +1926,7 @@ export class PlannerGraphService implements OnDestroy
 	{
 		const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
 		circle.setAttribute('r', '5');
-		circle.setAttribute('fill', '#141c28');
+		circle.setAttribute('fill', '#1e2d3b');
 		circle.setAttribute('stroke', SELECTED_STROKE);
 		circle.setAttribute('stroke-width', '1.5');
 		circle.style.pointerEvents = 'none';
@@ -2409,7 +2411,7 @@ export class PlannerGraphService implements OnDestroy
 	private baseStyleFor(node: Node): NodeStyle
 	{
 		const accent = this.accentColor(node);
-		const fill = NodeFillResolver.fill(accent, this.settings.graph().nodeFillStrength);
+		const fill = NodeFillResolver.fill(accent, this.settings.graph().nodeFillAmount);
 		const colors = node.done
 			? {bodyFill: DONE_FILL, bodyStroke: DONE_STROKE, darkText: false}
 			: {bodyFill: fill, bodyStroke: accent, darkText: NodeFillResolver.needsDarkText(fill)};
@@ -2447,7 +2449,7 @@ export class PlannerGraphService implements OnDestroy
 
 	private accentColor(node: Node): string
 	{
-		const colors = this.settings.graph().nodeColors;
+		const colors = this.settings.graph().nodeAccentColors;
 		if (node instanceof RecipeNode) {
 			const custom = this.planManager.activePlan()?.settings.graph?.machineColors?.[node.machine.className];
 			return custom ?? colors.recipe;
@@ -2558,16 +2560,16 @@ export class PlannerGraphService implements OnDestroy
 		let line: string;
 		if (open <= 1e-6) {
 			line = info.side === 'out'
-				? `All ${rate(total)} already goes to other nodes - drag to connect one more.`
-				: `All ${rate(total)} already comes from other nodes - drag to connect one more.`;
+				? `All ${rate(total)} goes to other nodes. Drag to add another connection.`
+				: `All ${rate(total)} comes from other nodes. Drag to add another connection.`;
 		} else if (Math.abs(open - total) <= 1e-6) {
 			line = info.side === 'out'
-				? `${rate(open)} unallocated - drag to connect to a consumer.`
-				: `${rate(open)} unsupplied - drag to connect to a producer.`;
+				? `${rate(open)} not used yet. Drag to connect it.`
+				: `${rate(open)} not supplied yet. Drag to connect it.`;
 		} else {
 			line = info.side === 'out'
-				? `${rate(open)} of ${rate(total)} unallocated - drag to connect to a consumer.`
-				: `${rate(open)} of ${rate(total)} unsupplied - drag to connect to a producer.`;
+				? `${rate(open)} of ${rate(total)} not used yet. Drag to connect it.`
+				: `${rate(open)} of ${rate(total)} not supplied yet. Drag to connect it.`;
 		}
 		this.showTooltip({title: item?.name ?? info.itemClassName, lines: [line]}, portElement);
 	}
@@ -2578,19 +2580,19 @@ export class PlannerGraphService implements OnDestroy
 			return {
 				title: `${node.getDisplayName()} - locked`,
 				lines: [
-					'Subplan nodes are always locked. The calculation connects to their inputs and outputs but never changes what is inside.',
+					'Subplans are always locked. The calculation never changes what is inside.',
 					...(node.buildCount > 1
-						? [`This subplan is built ${node.buildCount} times here, so it counts ${node.buildCount} times everywhere.`]
+						? [`Built ${node.buildCount} times here.`]
 						: []),
-					'Double-click the node to open and edit the subplan.',
+					'Double-click to open it.',
 				],
 			};
 		}
 		return {
 			title: `${node.getDisplayName()} - locked`,
 			lines: [
-				'This node is locked. The calculation keeps it as it is and never changes or replaces it.',
-				'Unlock it from the right-click menu or in the Inspector panel.',
+				'The calculation will not change this node.',
+				'Unlock it from the right-click menu or the Inspector.',
 			],
 		};
 	}
@@ -2634,7 +2636,7 @@ export class PlannerGraphService implements OnDestroy
 			iconHash: null,
 			title: 'Machines',
 			text: `the target needs ${this.rateFormatter.clock(warning.target / warning.capacity * 100)}% of what the `
-				+ 'machines can do - add machines or raise the clock speeds',
+				+ 'machines can do',
 		};
 	}
 
@@ -2643,7 +2645,7 @@ export class PlannerGraphService implements OnDestroy
 		const item = this.warningItem(itemClassName);
 		const shared = {iconHash: item?.icon ?? null, title: item?.name ?? itemClassName};
 		if (produced > consumed) {
-			return {...shared, kind: 'surplus', text: `${this.rateFormatter.rate(produced - consumed, item)} unconsumed`};
+			return {...shared, kind: 'surplus', text: `${this.rateFormatter.rate(produced - consumed, item)} not used`};
 		}
 		return {
 			...shared,

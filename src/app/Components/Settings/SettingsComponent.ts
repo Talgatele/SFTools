@@ -33,19 +33,19 @@ import {SettingsManager} from '@src/Model/Settings/SettingsManager';
 			padding: 0.6rem 0.85rem;
 			text-align: left;
 			color: #dde4ef;
-			background: #20374c;
+			background: var(--bs-dark);
 			border: 1px solid #4e5d6c;
 			border-left: 3px solid transparent;
 			transition: border-color 0.15s, background 0.15s;
 		}
 		.settings-nav button:hover {
-			border-color: #4c9be8;
-			border-left-color: #4c9be8;
+			border-color: var(--bs-primary);
+			border-left-color: var(--bs-primary);
 		}
 		.settings-nav button.active {
-			background: linear-gradient(90deg, rgba(76, 155, 232, 0.22), #20374c 70%);
-			border-color: rgba(76, 155, 232, 0.6);
-			border-left-color: #4c9be8;
+			background: linear-gradient(90deg, rgba(var(--bs-primary-rgb), 0.22), var(--bs-dark) 70%);
+			border-color: rgba(var(--bs-primary-rgb), 0.6);
+			border-left-color: var(--bs-primary);
 			color: #fff;
 		}
 		.nav-icon {
@@ -54,8 +54,7 @@ import {SettingsManager} from '@src/Model/Settings/SettingsManager';
 			display: inline-flex;
 			align-items: center;
 			justify-content: center;
-			background: rgba(76, 155, 232, 0.16);
-			color: #4c9be8;
+			color: var(--bs-primary);
 			font-size: 0.85rem;
 			flex-shrink: 0;
 		}

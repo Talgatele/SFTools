@@ -1,7 +1,7 @@
 import {Injectable} from '@angular/core';
 import {HttpClient} from '@angular/common/http';
 import {Observable} from 'rxjs';
-import {catchError, switchMap} from 'rxjs/operators';
+import {catchError, map, switchMap} from 'rxjs/operators';
 import {env} from '@env/env';
 import {CreateVersionRequest} from '@src/Model/API/Schema/CreateVersionRequest';
 import {LinkVersionsResponse} from '@src/Model/API/Schema/LinkVersionsResponse';
@@ -11,12 +11,16 @@ import {VersionDataLocation} from '@src/Model/API/Schema/VersionDataLocation';
 import {VersionFile} from '@src/Model/API/Schema/VersionFile';
 import {WorldDataPreview} from '@src/Model/API/Schema/World/WorldDataPreview';
 import {WorldDataRequest} from '@src/Model/API/Schema/World/WorldDataRequest';
+import {VersionResponseParser} from '@src/Model/API/VersionResponseParser';
 
 @Injectable({providedIn: 'root'})
 export class VersionsApiService
 {
 
-	public constructor(private readonly http: HttpClient)
+	public constructor(
+		private readonly http: HttpClient,
+		private readonly versionParser: VersionResponseParser,
+	)
 	{
 	}
 
@@ -32,7 +36,7 @@ export class VersionsApiService
 
 	public getVersion(id: string): Observable<Version>
 	{
-		return this.http.get<Version>(`${env.apiUrl}/v1/versions/${id}`);
+		return this.http.get<unknown>(`${env.apiUrl}/v1/versions/${id}`).pipe(map(body => this.versionParser.parseVersion(body)));
 	}
 
 	public ensureVersionData(id: string): Observable<VersionDataLocation>

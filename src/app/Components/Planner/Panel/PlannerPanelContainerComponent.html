@@ -47,7 +47,7 @@
 
 } @else {
 
-	<div class="rail">
+	<div class="rail" [style.width.px]="layout.railWidth()">
 		<planner-rail></planner-rail>
 	</div>
 
@@ -71,6 +71,10 @@
 
 	<div [style]="statusBarStyle">
 		<planner-status-bar></planner-status-bar>
+	</div>
+
+	<div [style]="canvasHintStyle">
+		<planner-canvas-hint/>
 	</div>
 
 	<div [style]="zoomStyle">

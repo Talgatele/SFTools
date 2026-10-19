@@ -205,7 +205,7 @@ export class ProductionSolverService
 
 	public diagnoseFailure(plan: Plan, lockedNodes: Node[] = []): Observable<string>
 	{
-		const generic = 'No solution found. What you asked for cannot be made with the current recipes, resource limits and locked nodes.';
+		const generic = 'No solution. This cannot be made with the current recipes, resource limits and locked nodes.';
 		const data = this.versionManager.activeVersionData();
 		if (data === null) {
 			return of(generic);
@@ -213,7 +213,7 @@ export class ProductionSolverService
 
 		const unproducible = this.findUnproducibleRequests(plan, data, lockedNodes);
 		if (unproducible.length > 0) {
-			return of(`No solution: ${unproducible.join(', ')} cannot be made with the enabled recipes and the available raw resources. Check the Recipes, Machines and Resources tabs.`);
+			return of(`No solution: ${unproducible.join(', ')} cannot be made with the enabled recipes and raw resources. Check the Recipes, Machines and Resources tabs.`);
 		}
 
 		const extra = this.extraPower.resolve(plan.settings);
@@ -248,9 +248,9 @@ export class ProductionSolverService
 						return generic;
 					}
 					return poolFolder === null
-						? 'No solution: the raw resource limits are too low, or a needed resource is switched off. Raise the limits or enable the resource in the Resources tab.'
-						: `No solution: the shared raw resources of folder ${poolFolder} are not enough for this plan. `
-							+ 'Other plans in the folder already use a part of them. Raise the folder limits or make the other plans smaller.';
+						? 'No solution: the raw resource limits are too low, or a needed resource is off. Change this in the Resources tab.'
+						: `No solution: not enough shared raw resources are left in folder ${poolFolder}. `
+							+ 'Raise the folder limits or make the other plans smaller.';
 				}),
 			);
 		}
@@ -929,7 +929,11 @@ export class ProductionSolverService
 			const maxSolution = await this.awaitSolve(this.buildLp(maxRequest, data, roundLocked), this.solveOptions(maxRequest, plan), run);
 			const maxStatus = this.mapStatus(maxSolution.Status);
 			if (maxStatus === 'Unbounded') {
-				throw new Error('There is no limit to how much can be made. Set raw resource limits in the Resources tab so that "as much as possible" is a real number.');
+				// Input-free recipes (e.g. the FICSMAS Gift Tree) make their products limitless whatever the resource limits are.
+				const free = roundBase.recipes.filter(recipe => recipe.ingredients.length === 0 && recipe.producedIn.length > 0);
+				throw new Error(free.length > 0
+					? `There is no limit to how much can be made, because ${free.map(recipe => recipe.name).join(', ')} needs no inputs. Turn it off in the Recipes tab.`
+					: 'There is no limit to how much can be made. Set raw resource limits in the Resources tab.');
 			}
 			if (maxStatus !== 'Optimal') {
 				if (first) {

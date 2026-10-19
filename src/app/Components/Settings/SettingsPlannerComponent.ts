@@ -4,6 +4,7 @@ import {FaIconComponent} from '@fortawesome/angular-fontawesome';
 import {CalculatorTab} from '@src/Components/Planner/Panels/Calculator/CalculatorTab';
 import {CalculatorTabDefinition} from '@src/Components/Planner/Panels/Calculator/CalculatorTabDefinition';
 import {CalculatorTabDefinitions} from '@src/Components/Planner/Panels/Calculator/CalculatorTabDefinitions';
+import {RailSize} from '@src/Model/Settings/RailSize';
 import {SettingsManager} from '@src/Model/Settings/SettingsManager';
 import {TabLabelsMode} from '@src/Model/Settings/TabLabelsMode';
 import {UnmakeableItemsDisplay} from '@src/Model/Settings/UnmakeableItemsDisplay';
@@ -50,7 +51,7 @@ export class SettingsPlannerComponent
 		{
 			value: 'hide',
 			label: 'Hide items the plan cannot produce (no spoilers)',
-			description: 'Items that no enabled recipe or generator can produce are not shown at all. Nothing is spoiled before you unlock it.',
+			description: 'Items that no enabled recipe or generator can produce are not shown.',
 		},
 	];
 
@@ -66,6 +67,24 @@ export class SettingsPlannerComponent
 	public setUnmakeableItems(value: UnmakeableItemsDisplay): void
 	{
 		this.settings.updatePlanner({unmakeableItems: value});
+	}
+
+	public readonly railSizeOptions: {value: RailSize; label: string}[] = [
+		{value: 'tiny', label: 'Tiny'},
+		{value: 'small', label: 'Small'},
+		{value: 'normal', label: 'Normal'},
+		{value: 'large', label: 'Large'},
+		{value: 'huge', label: 'Huge'},
+	];
+
+	public get railSize(): RailSize
+	{
+		return this.settings.planner().railSize;
+	}
+
+	public setRailSize(value: RailSize): void
+	{
+		this.settings.updatePlanner({railSize: value});
 	}
 
 	public readonly tabLabelsOptions: {value: TabLabelsMode; label: string; description: string}[] = [
@@ -155,7 +174,7 @@ export class SettingsPlannerComponent
 
 	public resetPanels(): void
 	{
-		if (confirm('Put all planner panels back to their default positions and sizes?')) {
+		if (confirm('Reset all planner panel positions and sizes?')) {
 			this.settings.updatePanels(null);
 		}
 	}
