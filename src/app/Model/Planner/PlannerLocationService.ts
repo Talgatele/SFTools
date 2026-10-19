@@ -38,9 +38,15 @@ export class PlannerLocationService
 		this.remember(location.versionSlug, null);
 	}
 
-	public remember(versionSlug: string, planId: string | null): void
+	public remember(versionSlug: string, planId: string | null, localPlanId?: string | null): void
 	{
-		const location: PlannerLocation = {versionSlug, planId};
+		const previous = this.locationSignal();
+		const rememberedLocalPlan = localPlanId !== undefined
+			? localPlanId
+			: planId === null && previous?.versionSlug === versionSlug
+				? previous.localPlanId ?? null
+				: null;
+		const location: PlannerLocation = {versionSlug, planId, localPlanId: rememberedLocalPlan};
 		this.locationSignal.set(location);
 		this.storage.setItem(STORAGE_KEY, JSON.stringify(location));
 	}
@@ -56,7 +62,11 @@ export class PlannerLocationService
 			if (typeof parsed?.versionSlug !== 'string') {
 				return null;
 			}
-			return {versionSlug: parsed.versionSlug, planId: typeof parsed.planId === 'string' ? parsed.planId : null};
+			return {
+				versionSlug: parsed.versionSlug,
+				planId: typeof parsed.planId === 'string' ? parsed.planId : null,
+				localPlanId: typeof parsed.localPlanId === 'string' ? parsed.localPlanId : null,
+			};
 		} catch {
 			return null;
 		}

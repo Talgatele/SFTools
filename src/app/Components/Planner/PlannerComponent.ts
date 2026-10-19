@@ -1,4 +1,4 @@
-import {AfterViewInit, Component, computed, effect, ElementRef, HostListener, OnDestroy, signal, ViewChild, ChangeDetectionStrategy} from '@angular/core';
+import {AfterViewInit, Component, computed, effect, ElementRef, HostListener, OnDestroy, signal, untracked, ViewChild, ChangeDetectionStrategy} from '@angular/core';
 import {toObservable} from '@angular/core/rxjs-interop';
 import {ActivatedRoute, Router} from '@angular/router';
 import {faBolt, faBook, faChartPie, faCircleQuestion, faCoins, faCrosshairs, faCubes, faFolderTree, faGear, faListCheck} from '@fortawesome/free-solid-svg-icons';
@@ -304,6 +304,22 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 
 		panelLayout.applyLayout(this.settings.panels());
 
+		// Restored panel layouts may leave the calculator closed. Selecting a plan should always bring its contents into view.
+		effect(() => {
+			const planId = this.planManager.activePlanId();
+			const folderId = this.planManager.activeFolderId();
+			if (planId === null && folderId === null) return;
+
+			untracked(() => this.panelLayout.focusPanel('calculator'));
+			const emptyPlanOnGraphTab = untracked(() => {
+				const plan = this.planManager.activePlan();
+				return this.calculatorTabs.activeTab() === 'graph' && (plan?.graph?.nodes.length ?? 0) === 0;
+			});
+			if (emptyPlanOnGraphTab) {
+				this.calculatorTabs.setActiveTab('request');
+			}
+		});
+
 		this.registerHotkeys();
 
 		if (this.route.snapshot.queryParamMap.has('codex')) {
@@ -544,10 +560,13 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 					const id = local ? null : activeId;
 					const inShare = this.route.snapshot.paramMap.get('shareId') !== null;
 					if (inShare && id === null && folderId === null) return;
-					if (!inShare && id === this.route.snapshot.paramMap.get('planId')) return;
 					const version = this.versionManager.activeVersion();
 					if (!version) return;
 					const slug = this.versionManager.urlSlug(version);
+					if (!inShare) {
+						this.plannerLocation.remember(slug, id, local ? activeId : null);
+					}
+					if (!inShare && id === this.route.snapshot.paramMap.get('planId')) return;
 					void this.router.navigate(
 						id ? ['/', slug, 'planner', id] : ['/', slug, 'planner'],
 						{queryParamsHandling: 'preserve'},
@@ -576,6 +595,20 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 				this.plannerLocation.remember(this.versionManager.urlSlug(version), params.get('planId'));
 			}),
 		);
+
+		// Local device plans are intentionally kept out of the shareable URL, so restore their id from local storage after the version store loads.
+		const savedLocation = this.plannerLocation.location();
+		const version = this.versionManager.activeVersion();
+		if (this.route.snapshot.paramMap.get('planId') === null
+			&& savedLocation?.versionSlug === (version === null ? null : this.versionManager.urlSlug(version))
+			&& savedLocation.localPlanId !== null
+			&& savedLocation.localPlanId !== undefined) {
+			if (this.planManager.findPlan(savedLocation.localPlanId)) {
+				this.planManager.setActivePlan(savedLocation.localPlanId);
+			} else {
+				this.plannerLocation.remember(savedLocation.versionSlug, null, null);
+			}
+		}
 
 		// Also re-render when read-only state flips (moving a device plan into the account keeps it selected).
 		this.subscription.add(

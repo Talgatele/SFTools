@@ -55,6 +55,10 @@ docker compose up --build
 
 Then visit `http://localhost:8080/`. See [docs/docker.md](docs/docker.md) for Docker CLI usage and deployment details.
 
+## Technical documentation
+
+See the [technical and agent guide](docs/technical-guide.md) for architecture, feature and source maps, data flows, persistence contracts, deployment, validation, and efficient workflows for humans and coding agents.
+
 ## License
 
 [MIT](LICENSE). Satisfactory is made by Coffee Stain Studios; game icons and
