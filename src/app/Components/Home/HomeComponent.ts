@@ -1,19 +1,14 @@
 import {Component, ChangeDetectionStrategy} from '@angular/core';
 import {RouterLink} from '@angular/router';
 import {FaIconComponent} from '@fortawesome/angular-fontawesome';
-import {faArrowRight, faBookOpen, faCircleInfo, faCircleQuestion, faDesktop, faDiagramProject, faHeart, faPlay, faPlus, faPuzzlePiece, faShareNodes, faSliders, faXmark} from '@fortawesome/free-solid-svg-icons';
-import {SupporterTickerComponent} from '@src/Components/Supporters/SupporterTickerComponent';
+import {faArrowRight, faBookOpen, faCircleInfo, faCircleQuestion, faDiagramProject, faPlay, faPlus, faPuzzlePiece, faShareNodes, faSliders, faXmark} from '@fortawesome/free-solid-svg-icons';
 import {HomeFeature} from '@src/Components/Home/HomeFeature';
 import {VersionTag} from '@src/Components/Home/VersionTag';
 import {Version} from '@src/Model/API/Schema/Version';
 import {WorldDataPayload} from '@src/Model/API/Schema/World/WorldDataPayload';
-import {CommunityLinks} from '@src/Model/CommunityLinks';
 import {VersionManager} from '@src/Model/Data/VersionManager';
 import {LocalPlanStoreBackend} from '@src/Model/Planner/LocalPlanStoreBackend';
 import {AppStorage} from '@src/Model/Storage/AppStorage';
-import {AppPlatform} from '@src/Model/Desktop/AppPlatform';
-import {OfflineVersionsService} from '@src/Model/Desktop/OfflineVersionsService';
-import {ConnectivityService} from '@src/Model/Network/ConnectivityService';
 import {PlanCountsService} from '@src/Model/Planner/PlanCountsService';
 import {RelativeTimeFormatter} from '@src/Model/RelativeTimeFormatter';
 import {PlannerLocationService} from '@src/Model/Planner/PlannerLocationService';
@@ -40,7 +35,7 @@ const WORLD_PURITY_LABELS: Record<string, string> = {
 @Component({
 	templateUrl: './HomeComponent.html',
 	changeDetection: ChangeDetectionStrategy.Eager,
-	imports: [RouterLink, FaIconComponent, HelpButtonComponent, SupporterTickerComponent],
+	imports: [RouterLink, FaIconComponent, HelpButtonComponent],
 	styles: [`
 		:host {
 			display: block;
@@ -76,13 +71,7 @@ const WORLD_PURITY_LABELS: Record<string, string> = {
 			display: grid;
 			grid-template-columns: minmax(0, 1fr);
 			gap: 2rem;
-			/* Top-aligned on purpose: the side card changes height (dismissing the sign-in panel) and the copy must not jump with it. */
 			align-items: start;
-		}
-		@media (min-width: 900px) {
-			.hero.with-side {
-				grid-template-columns: minmax(0, 1fr) 360px;
-			}
 		}
 		.hero-brand {
 			display: flex;
@@ -122,17 +111,6 @@ const WORLD_PURITY_LABELS: Record<string, string> = {
 			gap: 0.75rem;
 			align-items: stretch;
 		}
-		.hero-actions.with-wide {
-			display: grid;
-			grid-template-columns: repeat(2, minmax(0, max-content));
-		}
-		.hero-actions .btn-outline-light.hero-wide {
-			grid-column: 1 / -1;
-			padding-top: 0.5rem;
-			padding-bottom: 0.5rem;
-			--bs-btn-color: #dde4ef;
-			--bs-btn-border-color: rgba(255, 255, 255, 0.3);
-		}
 		.hero-actions .btn-lg {
 			display: inline-flex;
 			align-items: center;
@@ -147,9 +125,6 @@ const WORLD_PURITY_LABELS: Record<string, string> = {
 			.hero-actions {
 				flex-direction: column;
 				align-items: stretch;
-			}
-			.hero-actions.with-wide {
-				grid-template-columns: minmax(0, 1fr);
 			}
 			.hero-actions .btn-lg {
 				justify-content: center;
@@ -202,91 +177,6 @@ const WORLD_PURITY_LABELS: Record<string, string> = {
 			width: fit-content;
 			max-width: 100%;
 		}
-		/* Width 0 + min-width 100%: the box takes the buttons' width and never widens the column itself. */
-		.hero-support {
-			display: flex;
-			align-items: center;
-			gap: 0.75rem;
-			width: 0;
-			min-width: 100%;
-			padding: 0.5rem 0.9rem 0.5rem 0.75rem;
-			background: rgba(232, 184, 63, 0.07);
-			border: 1px solid rgba(232, 184, 63, 0.25);
-			border-left: 3px solid #e8b83f;
-		}
-		.hero-support-icon {
-			color: #e8b83f;
-			font-size: 1.25rem;
-			flex-shrink: 0;
-		}
-		.hero-support-text {
-			display: flex;
-			flex-direction: column;
-			gap: 0.15rem;
-			flex: 1 1 auto;
-			min-width: 0;
-		}
-		.hero-donate {
-			display: inline-flex;
-			align-items: center;
-			gap: 0.35rem;
-			flex-wrap: wrap;
-		}
-		.hero-support-text {
-			font-size: 0.9rem;
-			color: #c5d0db;
-		}
-		.hero-donate a {
-			color: #f7d08a;
-			text-decoration: none;
-		}
-		.hero-donate a:hover {
-			text-decoration: underline;
-		}
-		.side-note {
-			font-size: 0.8rem;
-		}
-
-		.side-card {
-			box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.35);
-		}
-		.side-card .card-header {
-			padding: 0.75rem 1.25rem;
-		}
-		.side-card .card-body {
-			padding: 1rem 1.25rem 1.25rem;
-		}
-		.side-card .card-footer {
-			padding: 0.5rem 1.25rem;
-		}
-		.welcome-avatar {
-			width: 40px;
-			height: 40px;
-			border-radius: 50%;
-			object-fit: cover;
-			flex-shrink: 0;
-		}
-		.quick-links {
-			display: flex;
-			flex-direction: column;
-			gap: 0.35rem;
-		}
-		.quick-links a {
-			display: flex;
-			align-items: center;
-			gap: 0.6rem;
-			padding: 0.5rem 0.75rem;
-			color: inherit;
-			text-decoration: none;
-			background: rgba(255, 255, 255, 0.04);
-			border: 1px solid rgba(78, 93, 108, 0.6);
-			transition: border-color 0.15s, background 0.15s;
-		}
-		.quick-links a:hover {
-			background: rgba(var(--bs-primary-rgb), 0.12);
-			border-color: var(--bs-primary);
-		}
-
 		.features {
 			display: grid;
 			grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -476,8 +366,6 @@ const WORLD_PURITY_LABELS: Record<string, string> = {
 		.tag-custom { background: rgba(91, 192, 222, 0.22); color: #a6e3f2; }
 		.tag-mods { background: rgba(156, 39, 176, 0.28); color: #d9a3e6; }
 		.tag-world { background: rgba(92, 184, 92, 0.22); color: #a8dea8; }
-		.tag-offline { background: rgba(32, 201, 151, 0.22); color: #8fe3c8; }
-		.tag-unavailable { background: rgba(134, 142, 150, 0.25); color: #c3c9cf; }
 		.plan-meta {
 			display: flex;
 			flex-direction: column;
@@ -510,14 +398,8 @@ export class HomeComponent
 	public readonly faSliders = faSliders;
 	public readonly faCircleInfo = faCircleInfo;
 	public readonly faCircleQuestion = faCircleQuestion;
-	public readonly faDesktop = faDesktop;
-	public readonly faHeart = faHeart;
-	public readonly communityLinks = CommunityLinks.COMMUNITY;
-	public readonly donationLinks = CommunityLinks.DONATIONS;
 	public readonly faDiagramProject = faDiagramProject;
 	public readonly faShareNodes = faShareNodes;
-
-	public readonly desktopAppLink: boolean;
 
 	private readonly localPlanStore: LocalPlanStoreBackend;
 
@@ -526,13 +408,9 @@ export class HomeComponent
 		private readonly planCounts: PlanCountsService,
 		private readonly plannerLocation: PlannerLocationService,
 		storage: AppStorage,
-		private readonly offlineVersions: OfflineVersionsService,
-		protected readonly connectivity: ConnectivityService,
-		protected readonly platform: AppPlatform,
 	)
 	{
 		this.localPlanStore = new LocalPlanStoreBackend(storage, versionManager, plannerLocation);
-		this.desktopAppLink = !platform.desktop && platform.desktopAppPublic;
 		this.planCounts.refresh();
 	}
 
@@ -618,19 +496,12 @@ export class HomeComponent
 				text: 'Change recipe and power costs or resource nodes, or add mods.',
 				link: ['/create-version'],
 			},
-			this.desktopAppLink
-				? {
-					icon: faDesktop,
-					title: 'Desktop app',
-					text: 'The planner as an app for Windows, Linux and macOS. Works offline and saves plans as files.',
-					link: ['/settings', 'desktop'],
-				}
-				: {
-					icon: faPuzzlePiece,
-					title: 'Mod editor',
-					text: 'Create local sets of changes to game data for use with custom versions.',
-					link: ['/mod-editor'],
-				},
+			{
+				icon: faPuzzlePiece,
+				title: 'Mod editor',
+				text: 'Create local sets of changes to game data for use with custom versions.',
+				link: ['/mod-editor'],
+			},
 		];
 	}
 
@@ -686,13 +557,6 @@ export class HomeComponent
 		}
 		if (version.worldData) {
 			tags.push(...this.worldTags(version.worldData, version.custom));
-		}
-		if (this.offlineVersions.available) {
-			if (this.offlineVersions.isOffline(version)) {
-				tags.push({label: 'Offline', tone: 'offline'});
-			} else if (!this.connectivity.online()) {
-				tags.push({label: 'Not downloaded', tone: 'unavailable'});
-			}
 		}
 		return tags;
 	}

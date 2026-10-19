@@ -1,19 +1,11 @@
-import {Injectable, Optional} from '@angular/core';
-import {DesktopBridge} from '@src/Model/Desktop/DesktopBridge';
+import {Injectable} from '@angular/core';
 
 @Injectable({providedIn: 'root'})
 export class FileDownloader
 {
 
-	public constructor(@Optional() private readonly desktop: DesktopBridge | null)
+	public async download(blob: Blob, fileName: string): Promise<void>
 	{
-	}
-
-	public async download(blob: Blob, fileName: string, reveal: boolean = false): Promise<string | null>
-	{
-		if (this.desktop !== null) {
-			return this.desktop.saveDownload(blob, fileName, reveal);
-		}
 		const url = URL.createObjectURL(blob);
 		const anchor = document.createElement('a');
 		anchor.href = url;
@@ -21,7 +13,6 @@ export class FileDownloader
 		anchor.click();
 		// The click starts the download asynchronously; revoking at once can cancel it.
 		setTimeout(() => URL.revokeObjectURL(url), 10_000);
-		return null;
 	}
 
 	public safeName(name: string, extension: string, fallback: string): string

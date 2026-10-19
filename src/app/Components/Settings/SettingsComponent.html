@@ -24,7 +24,7 @@
 				><fa-icon [icon]="faRotateLeft"></fa-icon> Reset all settings</button>
 			}
 			<info-note class="d-none d-md-flex">
-				Changes are saved automatically on {{ platform.device }}.
+				Changes are saved automatically in this browser.
 			</info-note>
 		</div>
 
@@ -44,9 +44,6 @@
 				}
 				@case ('hotkeys') {
 					<settings-hotkeys></settings-hotkeys>
-				}
-				@case ('desktop') {
-					<settings-desktop></settings-desktop>
 				}
 			}
 		</div>

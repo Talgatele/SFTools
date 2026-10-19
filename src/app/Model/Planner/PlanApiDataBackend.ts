@@ -1,4 +1,3 @@
-import {HttpErrorResponse} from '@angular/common/http';
 import {concat, Observable, of, Subject, Subscription} from 'rxjs';
 import {catchError, concatMap, debounceTime, map, tap, toArray} from 'rxjs/operators';
 import {FoldersApiService} from '@src/Model/API/FoldersApiService';
@@ -36,8 +35,6 @@ export class PlanApiDataBackend implements DataBackend<PlanStore>, SyncReporter<
 		private readonly foldersApi: FoldersApiService,
 		private readonly versionManager: VersionManager,
 		private readonly notifications: NotificationService,
-		/** In the desktop app an offline mirror keeps unsaved edits, so a lost connection is not worth a warning. */
-		private readonly connectionLossExpected = false,
 	)
 	{
 		this.subscription = this.saveSubject.pipe(
@@ -45,9 +42,6 @@ export class PlanApiDataBackend implements DataBackend<PlanStore>, SyncReporter<
 			concatMap(store => this.syncToApi(store).pipe(
 				catchError(err => {
 					console.error('Plan API sync failed:', err);
-					if (this.connectionLossExpected && err instanceof HttpErrorResponse && err.status === 0) {
-						return of(void 0);
-					}
 					this.notifications.show('Could not save your plans to your account. Keep this page open or they will be lost.', 10_000);
 					return of(void 0);
 				}),

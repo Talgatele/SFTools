@@ -7,12 +7,11 @@ import {ShareDialogService} from '@src/Components/Planner/Share/ShareDialogServi
 import {ShareDialogTarget} from '@src/Components/Planner/Share/ShareDialogTarget';
 import {ShareLinkKind} from '@src/Components/Planner/Share/ShareLinkKind';
 import {AuthService} from '@src/Model/Auth/AuthService';
-import {PublicUrlService} from '@src/Model/Desktop/PublicUrlService';
+import {PublicUrlService} from '@src/Model/PublicUrlService';
 import {VersionManager} from '@src/Model/Data/VersionManager';
 import {PlanManager} from '@src/Model/Planner/PlanManager';
 import {PlanStore} from '@src/Model/Planner/PlanStore';
 import {ShareCreator} from '@src/Model/Shares/ShareCreator';
-import {AppPlatform} from '@src/Model/Desktop/AppPlatform';
 
 /** Only the picked kind of link is shown: showing both at once meant people copied whichever box was already filled in instead of choosing. */
 @Component({
@@ -90,7 +89,6 @@ export class PlanShareDialogComponent
 
 	public constructor(
 		private readonly dialog: ShareDialogService,
-		protected readonly platform: AppPlatform,
 		private readonly planManager: PlanManager,
 		private readonly versionManager: VersionManager,
 		private readonly authService: AuthService,

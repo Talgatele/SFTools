@@ -1,4 +1,4 @@
-/** Synchronous like localStorage because services read it in their constructors; the desktop files are read into memory before the app starts. */
+/** Synchronous like localStorage because services read it in their constructors. */
 export abstract class AppStorage
 {
 

@@ -9,5 +9,4 @@ export interface VisitedShareSchema
 	sharedAt: string;
 	visitedAt: string;
 	version: ShareVersion;
-	sharedBySupporter?: boolean;
 }

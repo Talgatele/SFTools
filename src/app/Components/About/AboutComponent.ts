@@ -1,13 +1,10 @@
-import {Component, ChangeDetectionStrategy, effect} from '@angular/core';
-import {ActivatedRoute, RouterLink} from '@angular/router';
+import {Component, ChangeDetectionStrategy} from '@angular/core';
+import {RouterLink} from '@angular/router';
 import {FaIconComponent} from '@fortawesome/angular-fontawesome';
-import {faBookOpen, faDesktop, faDiagramProject, faHeart, faPuzzlePiece, faSliders} from '@fortawesome/free-solid-svg-icons';
-import {CommunityLinks} from '@src/Model/CommunityLinks';
+import {faBookOpen, faDiagramProject, faPuzzlePiece, faSliders} from '@fortawesome/free-solid-svg-icons';
 import {CreditList} from '@src/Model/About/CreditList';
-import {SupporterListService} from '@src/Model/Supporters/SupporterListService';
 import {BackLinkComponent} from '@src/Components/Common/BackLinkComponent';
 import {HomeFeature} from '@src/Components/Home/HomeFeature';
-import {AppPlatform} from '@src/Model/Desktop/AppPlatform';
 
 @Component({
 	templateUrl: './AboutComponent.html',
@@ -53,12 +50,6 @@ import {AppPlatform} from '@src/Model/Desktop/AppPlatform';
 			border-color: var(--bs-primary);
 			background: #243e56;
 		}
-		.feature-link {
-			display: inline-block;
-			margin-top: 0.35rem;
-			font-size: 0.875rem;
-			color: var(--bs-primary);
-		}
 		.feature-icon {
 			flex-shrink: 0;
 			width: 2.25rem;
@@ -103,49 +94,6 @@ import {AppPlatform} from '@src/Model/Desktop/AppPlatform';
 		.credit-text {
 			margin: 0;
 		}
-		.link-row {
-			display: flex;
-			flex-wrap: wrap;
-			gap: 0.75rem;
-		}
-		.link-row a {
-			display: inline-flex;
-			align-items: center;
-			gap: 0.6rem;
-			padding: 0.6rem 1rem;
-			background: var(--bs-dark);
-			border: 1px solid #4e5d6c;
-			color: inherit;
-			text-decoration: none;
-			transition: border-color 0.15s, background 0.15s;
-		}
-		.link-row a:hover {
-			border-color: var(--bs-primary);
-			background: rgba(var(--bs-primary-rgb), 0.12);
-		}
-		.link-row .donation fa-icon {
-			color: #e05c8a;
-		}
-		#supporters {
-			scroll-margin-top: 4.5rem;
-		}
-		.supporter-list {
-			list-style: none;
-			padding: 0;
-			margin: 0;
-			display: flex;
-			flex-wrap: wrap;
-			gap: 0.5rem;
-		}
-		.supporter-list li {
-			display: inline-flex;
-			align-items: center;
-			gap: 0.45rem;
-			padding: 0.3rem 0.75rem;
-			background: var(--bs-dark);
-			border: 1px solid rgba(232, 184, 63, 0.45);
-			overflow-wrap: anywhere;
-		}
 		.name-list {
 			list-style: none;
 			padding: 0;
@@ -159,35 +107,17 @@ import {AppPlatform} from '@src/Model/Desktop/AppPlatform';
 			background: var(--bs-dark);
 			border: 1px solid #4e5d6c;
 		}
-		.supporter-list fa-icon {
-			color: #e8b83f;
-			font-size: 0.8em;
-		}
 	`],
 })
 export class AboutComponent
 {
 
-	public readonly faHeart = faHeart;
-	public readonly communityLinks = CommunityLinks.COMMUNITY;
-	public readonly donationLinks = CommunityLinks.DONATIONS;
 	public readonly creditGroups = CreditList.GROUPS;
 
 	public readonly features: HomeFeature[];
 
-	public constructor(platform: AppPlatform, protected readonly supporterList: SupporterListService, route: ActivatedRoute)
+	public constructor()
 	{
-		// The home page links to #supporters, which only exists once the list is there - too late for the router.
-		let scrolled = route.snapshot.fragment !== 'supporters';
-		effect(() => {
-			if (!scrolled && supporterList.names().length > 0) {
-				scrolled = true;
-				setTimeout(() => document.getElementById('supporters')?.scrollIntoView({block: 'start'}));
-			}
-		});
-
-		supporterList.reload();
-
 		this.features = [
 			{
 				icon: faDiagramProject,
@@ -214,14 +144,6 @@ export class AboutComponent
 				link: null,
 			},
 		];
-		if (!platform.desktop && platform.desktopAppPublic) {
-			this.features.push({
-				icon: faDesktop,
-				title: 'Desktop app',
-				text: 'The planner as an app for Windows, Linux and macOS. Works offline and keeps your plans in files.',
-				link: ['/settings', 'desktop'],
-			});
-		}
 	}
 
 }

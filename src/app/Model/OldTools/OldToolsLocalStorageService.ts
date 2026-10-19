@@ -66,7 +66,7 @@ export class OldToolsLocalStorageService
 	private read(key: string): OldProductionData[]
 	{
 		try {
-			// Raw localStorage, not AppStorage: only the old site wrote these keys (the desktop app's storage never has them).
+			// Raw localStorage, not AppStorage: only the old site wrote these keys.
 			const raw = localStorage.getItem(key);
 			if (raw === null) {
 				return [];

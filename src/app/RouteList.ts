@@ -98,7 +98,7 @@ export class RouteList
 				{
 					path: 'about',
 					title: 'About',
-					data: {description: 'Who makes Satisfactory Tools, what it can do, and where to report a bug or ask for a feature.'},
+					data: {description: 'Who makes Satisfactory Tools and what it can do.'},
 					component: AboutComponent,
 				},
 				{

@@ -5,7 +5,6 @@ import {FormsModule} from '@angular/forms';
 import {FaIconComponent} from '@fortawesome/angular-fontawesome';
 import {faCaretDown, faCaretRight, faClockRotateLeft, faEllipsisVertical, faFileExport, faFileImport, faFileLines, faFolder, faFolderPlus, faLaptop, faLayerGroup, faLock, faPlus, faShareNodes, faSquareMinus, faSquarePlus} from '@fortawesome/free-solid-svg-icons';
 import {AppTooltipDirective} from '@src/Components/Common/AppTooltipDirective';
-import {SupporterBadgeComponent} from '@src/Components/Supporters/SupporterBadgeComponent';
 import {InfoNoteComponent} from '@src/Components/Common/InfoNoteComponent';
 import {LongPressContextMenuDirective} from '@src/Components/Common/LongPressContextMenuDirective';
 import {LongPressDragDirective} from '@src/Components/Common/LongPressDragDirective';
@@ -45,8 +44,7 @@ import {ShareTreeCache} from '@src/Model/Shares/ShareTreeCache';
 import {ShareTreeNode} from '@src/Model/Shares/ShareTreeNode';
 import {VisitedShare} from '@src/Model/Shares/VisitedShare';
 import {VisitedSharesManager} from '@src/Model/Shares/VisitedSharesManager';
-import {PublicUrlService} from '@src/Model/Desktop/PublicUrlService';
-import {AppPlatform} from '@src/Model/Desktop/AppPlatform';
+import {PublicUrlService} from '@src/Model/PublicUrlService';
 import {PlanCreator} from '@src/Components/Planner/Panels/Plans/PlanCreator';
 import {ContextMenuItem} from '@src/Components/Planner/ContextMenu/ContextMenuItem';
 import {PlanSectionContextMenu} from '@src/Components/Planner/Panels/Plans/PlanSectionContextMenu';
@@ -140,7 +138,7 @@ const AUTO_SCROLL_INTERVAL_MS = 16;
 	changeDetection: ChangeDetectionStrategy.Eager,
 	templateUrl: './PlannerPlansComponent.html',
 	styleUrl: './PlannerPlansComponent.scss',
-	imports: [FormsModule, FaIconComponent, AppTooltipDirective, IconPickerDialogComponent, ImportOldPlansDialogComponent, TruncateTitleDirective, InfoNoteComponent, LongPressContextMenuDirective, LongPressDragDirective, SupporterBadgeComponent, PlanTreeIconComponent],
+	imports: [FormsModule, FaIconComponent, AppTooltipDirective, IconPickerDialogComponent, ImportOldPlansDialogComponent, TruncateTitleDirective, InfoNoteComponent, LongPressContextMenuDirective, LongPressDragDirective, PlanTreeIconComponent],
 })
 export class PlannerPlansComponent implements AfterViewChecked, OnDestroy, PlanTreeMenuHost, HotkeyItemSource
 {
@@ -482,7 +480,6 @@ export class PlannerPlansComponent implements AfterViewChecked, OnDestroy, PlanT
 	public constructor(
 		private readonly planManager: PlanManager,
 		private readonly contextMenu: PlannerContextMenuService,
-		protected readonly platform: AppPlatform,
 		private readonly planIcons: PlanIconResolver,
 		private readonly planNames: PlanNameResolver,
 		private readonly versionManager: VersionManager,

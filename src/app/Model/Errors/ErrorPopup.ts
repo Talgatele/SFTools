@@ -1,6 +1,4 @@
-import {Injectable, NgZone, Optional} from '@angular/core';
-import {CommunityLinks} from '@src/Model/CommunityLinks';
-import {DesktopBridge} from '@src/Model/Desktop/DesktopBridge';
+import {Injectable, NgZone} from '@angular/core';
 import {ErrorReport} from '@src/Model/Errors/ErrorReport';
 
 /**
@@ -11,16 +9,13 @@ import {ErrorReport} from '@src/Model/Errors/ErrorReport';
 export class ErrorPopup
 {
 
-	private readonly entries: {report: ErrorReport; count: number; reported: boolean}[] = [];
+	private readonly entries: {report: ErrorReport; count: number}[] = [];
 	private readonly closedSignatures = new Set<string>();
 	private ignoreAll = false;
 	private detailsOpen = false;
 	private element: HTMLElement | null = null;
 
-	public constructor(
-		private readonly zone: NgZone,
-		@Optional() private readonly desktop: DesktopBridge | null,
-	)
+	public constructor(private readonly zone: NgZone)
 	{
 	}
 
@@ -35,22 +30,8 @@ export class ErrorPopup
 			entry.count++;
 			return;
 		}
-		this.entries.push({report, count: 1, reported: false});
+		this.entries.push({report, count: 1});
 		this.zone.runOutsideAngular(() => this.render());
-	}
-
-	/** Updates the open popup in place: re-rendering would drop a selection made for copying. */
-	public markReported(signature: string): void
-	{
-		const entry = this.entries.find(candidate => candidate.report.signature === signature);
-		if (entry === undefined || entry.reported) {
-			return;
-		}
-		entry.reported = true;
-		const note = this.element?.querySelector<HTMLElement>('.app-error-popup-reported');
-		if (note !== null && note !== undefined) {
-			this.fillReportedNote(note);
-		}
 	}
 
 	private close(ignoreAll: boolean): void
@@ -80,12 +61,7 @@ export class ErrorPopup
 			body.append(this.create('p', 'mb-0', 'Part of the page could not load because the site was updated. Reload the page to get the new version.'));
 		} else {
 			body.append(this.create('p', 'mb-2', 'Part of the page may have stopped working. Reloading the page usually fixes it.'));
-			const reported = this.create('p', 'app-error-popup-reported small text-secondary mb-2');
-			this.fillReportedNote(reported);
-			body.append(reported);
-			const help = this.create('p', 'small text-secondary mb-2', 'If it keeps happening, copy the details and send them to us on ');
-			help.append(this.link(CommunityLinks.DISCORD.label, CommunityLinks.DISCORD.url), ' or ', this.link(CommunityLinks.GITHUB.label, CommunityLinks.GITHUB.url), '.');
-			body.append(help);
+			body.append(this.create('p', 'small text-secondary mb-2', 'If it keeps happening, copy the details below for troubleshooting.'));
 			const details = this.create('details', 'small');
 			details.open = this.detailsOpen;
 			details.addEventListener('toggle', () => this.detailsOpen = details.open);
@@ -111,19 +87,6 @@ export class ErrorPopup
 			this.element.replaceWith(popup);
 		}
 		this.element = popup;
-	}
-
-	private fillReportedNote(note: HTMLElement): void
-	{
-		const count = this.entries.filter(entry => entry.reported).length;
-		note.hidden = count === 0;
-		if (count === 0) {
-			return;
-		}
-		const settings = this.create('a', '', 'Turn off error reports');
-		// A full page load on purpose: the router may be what broke.
-		settings.href = '/settings/account';
-		note.replaceChildren(count === this.entries.length ? 'An error report was sent to us automatically. ' : 'Some of these errors were reported to us automatically. ', settings);
 	}
 
 	private detailsText(): string
@@ -154,22 +117,6 @@ export class ErrorPopup
 			window.getSelection()?.removeAllRanges();
 			window.getSelection()?.addRange(range);
 		});
-	}
-
-	private link(label: string, url: string): HTMLAnchorElement
-	{
-		const link = this.create('a', '', label);
-		link.href = url;
-		link.target = '_blank';
-		link.rel = 'noopener';
-		if (this.desktop !== null) {
-			const desktop = this.desktop;
-			link.addEventListener('click', event => {
-				event.preventDefault();
-				desktop.openExternal(url);
-			});
-		}
-		return link;
 	}
 
 	private button(className: string, label: string, action: () => void): HTMLButtonElement

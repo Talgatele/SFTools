@@ -6,7 +6,7 @@
 		<div>
 			<h2 class="mb-1">About Satisfactory Tools</h2>
 			<p class="text-secondary mb-0">
-				An all-in-one planner for Satisfactory. Your plans and settings stay on this device.
+				An all-in-one planner for Satisfactory. Your plans and settings stay in this browser.
 			</p>
 		</div>
 	</div>
@@ -20,7 +20,6 @@
 					<div>
 						<div class="feature-title">{{ feature.title }}</div>
 						<p class="feature-text">{{ feature.text }}</p>
-						<span class="feature-link">Download</span>
 					</div>
 				</a>
 			} @else {
@@ -35,42 +34,15 @@
 		}
 	</div>
 
-	<div class="section-title">Community</div>
-	<div class="link-row">
-		@for (link of communityLinks; track link.key) {
-			<a [href]="link.url" target="_blank" rel="noopener"><fa-icon [icon]="link.icon" [fixedWidth]="true"></fa-icon>{{ link.label }}</a>
-		}
-	</div>
-
-	<div class="section-title">Support the project</div>
-	<p class="text-secondary">
-		Satisfactory Tools is free and stays free. Donations help pay for the servers.
-	</p>
-	<div class="link-row">
-		@for (link of donationLinks; track link.key) {
-			<a class="donation" [href]="link.url" target="_blank" rel="noopener"><fa-icon [icon]="link.icon" [fixedWidth]="true"></fa-icon>Donate via {{ link.label }}</a>
-		}
-	</div>
-
-	@if (supporterList.names().length > 0) {
-		<div class="section-title" id="supporters">Supporters</div>
-		<p class="text-secondary">Thank you to everyone who keeps the tools running:</p>
-		<ul class="supporter-list">
-			@for (name of supporterList.names(); track $index) {
-				<li><fa-icon [icon]="faHeart"></fa-icon>{{ name }}</li>
-			}
-		</ul>
-	}
-
 	<div class="section-title">Credits</div>
 	<div class="credits">
 		<div class="credit">
 			<span class="credit-role">Author</span>
-			<p class="credit-text">greeny - <a href="https://github.com/greeny/" target="_blank" rel="noopener">github.com/greeny</a>, greeny.dev on Discord.</p>
+			<p class="credit-text">greeny.</p>
 		</div>
 		<div class="credit">
 			<span class="credit-role">World node generator</span>
-			<p class="credit-text">Fork of <a href="https://github.com/Konsl/satisfactory-world-generator" target="_blank" rel="noopener">satisfactory-world-generator</a> by <a href="https://github.com/Konsl" target="_blank" rel="noopener">Konsl</a>.</p>
+			<p class="credit-text">Fork of satisfactory-world-generator by Konsl.</p>
 		</div>
 		<div class="credit">
 			<span class="credit-role">Game assets</span>
@@ -88,8 +60,4 @@
 		</ul>
 	}
 
-	<div class="section-title">Feedback</div>
-	<p class="text-secondary mb-0">
-		Found a bug or missing a feature? Tell me on Discord or GitHub.
-	</p>
 </div>

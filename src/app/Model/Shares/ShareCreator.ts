@@ -4,7 +4,7 @@ import {SharesApiService} from '@src/Model/API/SharesApiService';
 import {ShareCreateRequest} from '@src/Model/API/Schema/Shares/ShareCreateRequest';
 import {ShareType} from '@src/Model/API/Schema/Shares/ShareType';
 import {AuthService} from '@src/Model/Auth/AuthService';
-import {PublicUrlService} from '@src/Model/Desktop/PublicUrlService';
+import {PublicUrlService} from '@src/Model/PublicUrlService';
 import {VersionManager} from '@src/Model/Data/VersionManager';
 import {PlanStore} from '@src/Model/Planner/PlanStore';
 import {ShareTreeBuilder} from '@src/Model/Shares/ShareTreeBuilder';

@@ -1,4 +1,4 @@
-// Bundled rather than from Google Fonts, so the desktop app has it offline.
+// Bundle the font locally so the page does not depend on an external font service.
 @import "@fontsource/lato/300.css";
 @import "@fontsource/lato/400.css";
 @import "@fontsource/lato/700.css";
@@ -48,9 +48,9 @@ body {
 	cursor: default;
 }
 
-// WebKit (the macOS desktop webview) makes fields read-only when an ancestor turns selection off,
+// WebKit makes fields read-only when an ancestor turns selection off,
 // so they opt back in explicitly; `cursor: auto` restores the I-beam the body rule replaced.
-// Error alerts are selectable so their text can be pasted into a bug report.
+// Error alerts are selectable so their details can be copied for troubleshooting.
 input,
 textarea,
 [contenteditable]:not([contenteditable="false"]),
@@ -77,7 +77,7 @@ textarea,
 	user-select: none;
 }
 
-// Chromium and WebKit (every desktop webview); RootComponent covers Firefox.
+// Prevent dragging images out of the page in Chromium and WebKit; RootComponent covers Firefox.
 img {
 	-webkit-user-drag: none;
 }
@@ -337,31 +337,6 @@ circle.pg-port-adsorbed {
 	}
 }
 
-// WebKitGTK paints native scrollbars over everything whatever the z-index; styled ones are
-// drawn as part of the page and stack like the rest.
-.desktop-app,
-.desktop-app * {
-	&::-webkit-scrollbar {
-		width: 10px;
-		height: 10px;
-	}
-
-	&::-webkit-scrollbar-track,
-	&::-webkit-scrollbar-corner {
-		background: transparent;
-	}
-
-	&::-webkit-scrollbar-thumb {
-		background-color: rgba(235, 235, 235, 0.25);
-		background-clip: padding-box;
-		border: 2px solid transparent;
-		border-radius: 5px;
-	}
-
-	&::-webkit-scrollbar-thumb:hover {
-		background-color: rgba(235, 235, 235, 0.45);
-	}
-}
 
 // Zoomed-out view, toggled on the graph container by zoom level. The swapped-in elements carry
 // display="none" so image exports, which do not copy these styles, keep the full detail.

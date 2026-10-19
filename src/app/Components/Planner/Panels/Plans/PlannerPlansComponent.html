@@ -167,7 +167,7 @@
 		</div>
 
 		@if (localOpen()) {
-			<info-note class="tree-section-note">Made while signed out. Saved only on {{ platform.device }}. To edit one, drag it onto &ldquo;Your plans&rdquo; or use its menu.</info-note>
+			<info-note class="tree-section-note">Made while signed out. Saved only in this browser. To edit one, drag it onto &ldquo;Your plans&rdquo; or use its menu.</info-note>
 
 			@for (item of localTreeItems(); track item.kind + ':' + item.id) {
 				<div
@@ -265,9 +265,6 @@
 					<span class="tree-plan-icon">
 						<plan-tree-icon [kind]="share.type" [open]="isShareExpanded(share.share)" [iconHash]="visitedShareIconHash(share)" [alt]="visitedShareName(share)"></plan-tree-icon>
 					</span>
-					@if (share.sharedBySupporter) {
-						<supporter-badge class="tree-supporter-badge" placement="right"/>
-					}
 					<span class="flex-grow-1 text-truncate tree-label" [truncateTitle]="visitedShareName(share)">{{ visitedShareName(share) }}</span>
 					<button class="btn btn-link btn-sm py-0 text-secondary tree-action tree-menu" type="button" aria-label="Shared plan menu" (click)="onVisitedShareContextMenu($event, share)">
 						<fa-icon [icon]="faEllipsisVertical"></fa-icon>

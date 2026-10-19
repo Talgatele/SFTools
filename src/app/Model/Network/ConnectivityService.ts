@@ -4,7 +4,7 @@ import {env} from '@env/env';
 const PROBE_INTERVAL = 15_000;
 const PROBE_TIMEOUT = 8_000;
 /** Cheap, public and uncached - any answer at all means the API is reachable. */
-const PROBE_PATH = '/v1/auth/oauth/providers';
+const PROBE_PATH = '/v1/versions/plan-counts';
 
 /**
  * navigator.onLine only knows about the network adapter, so a failed request (status 0) also counts:

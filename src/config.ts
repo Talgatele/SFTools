@@ -7,7 +7,6 @@ import {ApiCallLogInterceptor} from '@src/Model/Errors/ApiCallLogInterceptor';
 import {AppErrorHandler} from '@src/Model/Errors/AppErrorHandler';
 import {RetryInterceptor} from '@src/Model/API/RetryInterceptor';
 import {ConnectivityInterceptor} from '@src/Model/Network/ConnectivityInterceptor';
-import {OfflineCacheInterceptor} from '@src/Model/Network/OfflineCacheInterceptor';
 import {AppTitleStrategy} from '@src/Model/Meta/AppTitleStrategy';
 import {RouteList} from '@src/RouteList';
 import {BrowserAnimationsModule} from '@angular/platform-browser/animations';
@@ -25,8 +24,6 @@ export const config: ApplicationConfig = {
 			withInMemoryScrolling({scrollPositionRestoration: 'enabled'}),
 		),
 		provideHttpClient(withFetch(), withInterceptorsFromDi()),
-		// Order matters: the offline cache answers before anything is retried, and connectivity sees every attempt.
-		{provide: HTTP_INTERCEPTORS, useClass: OfflineCacheInterceptor, multi: true},
 		{provide: HTTP_INTERCEPTORS, useClass: RetryInterceptor, multi: true},
 		{provide: HTTP_INTERCEPTORS, useClass: ConnectivityInterceptor, multi: true},
 		{provide: HTTP_INTERCEPTORS, useClass: ApiCallLogInterceptor, multi: true},

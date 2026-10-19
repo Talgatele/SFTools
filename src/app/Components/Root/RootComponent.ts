@@ -3,10 +3,7 @@ import {RouterOutlet} from '@angular/router';
 import {FaIconComponent} from '@fortawesome/angular-fontawesome';
 import {faPlugCircleXmark} from '@fortawesome/free-solid-svg-icons';
 import {HelpImageViewerComponent} from '@src/Components/Help/HelpImageViewerComponent';
-import {DesktopUpdateBannerComponent} from '@src/Components/Root/DesktopUpdateBannerComponent';
-import {OpenInDesktopComponent} from '@src/Components/Root/OpenInDesktopComponent';
 import {ServerStatusService} from '@src/Model/API/ServerStatusService';
-import {DesktopIntegrationService} from '@src/Model/Desktop/DesktopIntegrationService';
 import {ConnectivityService} from '@src/Model/Network/ConnectivityService';
 import {HotkeyService} from '@src/Model/Hotkeys/HotkeyService';
 import {PageScrollbarService} from '@src/PageScrollbarService';
@@ -19,8 +16,6 @@ import {PageScrollbarService} from '@src/PageScrollbarService';
         RouterOutlet,
         FaIconComponent,
         HelpImageViewerComponent,
-        DesktopUpdateBannerComponent,
-        OpenInDesktopComponent,
     ]
 })
 export class RootComponent
@@ -32,12 +27,9 @@ export class RootComponent
         public readonly serverStatus: ServerStatusService,
         private readonly hotkeys: HotkeyService,
         public readonly connectivity: ConnectivityService,
-        desktopIntegration: DesktopIntegrationService,
         pageScrollbar: PageScrollbarService,
     )
     {
-        // A no-op on the website.
-        desktopIntegration.start();
         pageScrollbar.start();
     }
 

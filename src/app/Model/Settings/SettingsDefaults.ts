@@ -69,7 +69,6 @@ export class SettingsDefaults
 			groupTabs: true,
 			moreTabs: CalculatorTabDefinitions.DEFAULT_MORE,
 			helpButtons: true,
-			supporterHearts: true,
 		},
 		planDefaults: {
 			alternateRecipes: false,
@@ -82,7 +81,6 @@ export class SettingsDefaults
 		},
 		account: {
 			signInPrompts: true,
-			errorReports: true,
 		},
 		hotkeys: {},
 		panels: null,

@@ -1,10 +1,9 @@
-import {Injectable, Optional} from '@angular/core';
+import {Injectable} from '@angular/core';
 import {HttpErrorResponse, HttpEvent, HttpHandler, HttpInterceptor, HttpRequest} from '@angular/common/http';
 import {Observable, throwError, timer} from 'rxjs';
 import {catchError, finalize, switchMap} from 'rxjs/operators';
 import {env} from '@env/env';
 import {ServerStatusService} from '@src/Model/API/ServerStatusService';
-import {DesktopBridge} from '@src/Model/Desktop/DesktopBridge';
 import {ConnectivityService} from '@src/Model/Network/ConnectivityService';
 
 /** Totals just over half a minute - how long a deployment takes to swap the API over. */
@@ -23,7 +22,6 @@ export class RetryInterceptor implements HttpInterceptor
 	public constructor(
 		private readonly serverStatus: ServerStatusService,
 		private readonly connectivity: ConnectivityService,
-		@Optional() private readonly desktop: DesktopBridge | null,
 	)
 	{
 	}
@@ -60,11 +58,10 @@ export class RetryInterceptor implements HttpInterceptor
 		if (GATEWAY_STATUSES.includes(err.status)) {
 			return true;
 		}
-		// Status 0 never completed, so only methods that change nothing are replayed. The desktop app stops once the
-		// connection is known to be gone (its offline cache answers); a website cannot tell that from a deploy refusing connections.
+		// Status 0 never completed, so only replay safe methods while the browser reports a connection.
 		return err.status === 0
 			&& SAFE_METHODS.includes(req.method.toUpperCase())
-			&& (this.desktop === null || this.connectivity.online());
+			&& this.connectivity.online();
 	}
 
 }

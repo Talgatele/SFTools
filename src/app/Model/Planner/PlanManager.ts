@@ -1,15 +1,11 @@
-import {Injectable, Optional, Signal, computed, signal} from '@angular/core';
+import {Injectable, Signal, computed, signal} from '@angular/core';
 import {toObservable} from '@angular/core/rxjs-interop';
 import {Observable, Subject, distinctUntilChanged, filter, map, skip} from 'rxjs';
 import {AuthService} from '@src/Model/Auth/AuthService';
 import {FoldersApiService} from '@src/Model/API/FoldersApiService';
 import {PlansApiService} from '@src/Model/API/PlansApiService';
 import {VersionManager} from '@src/Model/Data/VersionManager';
-import {DesktopBridge} from '@src/Model/Desktop/DesktopBridge';
-import {ConnectivityService} from '@src/Model/Network/ConnectivityService';
 import {NotificationService} from '@src/Model/NotificationService';
-import {DataBackend} from '@src/Model/Sync/DataBackend';
-import {OfflineMirrorBackend} from '@src/Model/Sync/OfflineMirrorBackend';
 import {SyncableService} from '@src/Model/Sync/SyncableService';
 import {UseLocalConflictResolver} from '@src/Model/Sync/UseLocalConflictResolver';
 import {Folder} from '@src/Model/Planner/Folder';
@@ -21,7 +17,6 @@ import {PlanApiDataBackend} from '@src/Model/Planner/PlanApiDataBackend';
 import {PlanLabelAssigner} from '@src/Model/Planner/PlanLabelAssigner';
 import {PlanSettings} from '@src/Model/Planner/PlanSettings';
 import {PlanStore} from '@src/Model/Planner/PlanStore';
-import {PlanStoreOfflineMerger} from '@src/Model/Planner/PlanStoreOfflineMerger';
 import {PlanTree} from '@src/Model/Planner/PlanTree';
 import {PlanTreeFolder} from '@src/Model/Planner/PlanTreeFolder';
 import {PlanTreePlan} from '@src/Model/Planner/PlanTreePlan';
@@ -130,28 +125,14 @@ export class PlanManager extends SyncableService<PlanStore>
 		private readonly settingsManager: SettingsManager,
 		private readonly labels: PlanLabelAssigner,
 		storage: AppStorage,
-		connectivity: ConnectivityService,
-		@Optional() desktop: DesktopBridge | null,
 	)
 	{
 		const localBackend = new LocalPlanStoreBackend(storage, versionManager, plannerLocation);
-		const apiBackend = new PlanApiDataBackend(plansApiService, foldersApiService, versionManager, notifications, desktop !== null);
-		// The desktop app keeps working on the account's plans while offline.
-		const remoteBackend: DataBackend<PlanStore> = desktop === null ? apiBackend : new OfflineMirrorBackend<PlanStore>(
-			apiBackend,
-			apiBackend,
-			storage,
-			'plans',
-			() => versionManager.activeVersion()?.id ?? null,
-			new PlanStoreOfflineMerger(),
-			connectivity,
-			notifications,
-			'plans',
-		);
+		const apiBackend = new PlanApiDataBackend(plansApiService, foldersApiService, versionManager, notifications);
 		super(
 			authService,
 			localBackend,
-			remoteBackend,
+			apiBackend,
 			new UseLocalConflictResolver<PlanStore>(),
 			EMPTY_STORE,
 			notifications,
@@ -181,15 +162,6 @@ export class PlanManager extends SyncableService<PlanStore>
 				this.refreshLocalStore();
 			}
 		});
-
-		// Back online: the reload is what sends the edits made offline.
-		if (desktop !== null) {
-			toObservable(connectivity.online).pipe(skip(1), filter(online => online)).subscribe(() => {
-				if (authService.isAuthenticated()) {
-					this.reload();
-				}
-			});
-		}
 	}
 
 	/** Between a version switch and its load, data() still holds the previous version's plans while the backends already write to the new one; saving then would copy plans across versions. */

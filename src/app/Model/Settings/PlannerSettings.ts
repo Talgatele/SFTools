@@ -19,8 +19,4 @@ export interface PlannerSettings
 	readonly moreTabs: readonly CalculatorTab[];
 
 	readonly helpButtons: boolean;
-
-	/** Viewer-side only: the hearts on supporters' shared plans. Link previews are not affected. */
-	readonly supporterHearts: boolean;
-
 }

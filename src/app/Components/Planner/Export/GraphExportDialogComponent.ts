@@ -197,8 +197,8 @@ export class GraphExportDialogComponent implements OnInit
 				? new Blob([snapshot.render(snapshot.contentBox, background)], {type: 'image/svg+xml;charset=utf-8'})
 				: await this.rasterizer.toBlob(new SnapshotRasterSource(snapshot, snapshot.contentBox, background), this.sizeFor(snapshot.contentBox, this.scale()));
 			const fileName = this.downloader.safeName(this.planName(), this.format(), 'production-graph');
-			const savedPath = await this.downloader.download(blob, fileName);
-			this.notifications.showSuccess(savedPath === null ? `Downloaded ${fileName}.` : `Saved to ${savedPath} and opened.`);
+			await this.downloader.download(blob, fileName);
+			this.notifications.showSuccess(`Downloaded ${fileName}.`);
 			this.dialog.remember({format: this.format(), background: this.background(), scale: this.scale()});
 			this.close();
 		} catch (error) {

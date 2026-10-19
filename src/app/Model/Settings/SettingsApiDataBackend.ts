@@ -21,8 +21,6 @@ export class SettingsApiDataBackend implements DataBackend<Settings>, SyncReport
 	public constructor(
 		private readonly api: SettingsApiService,
 		private readonly notifications: NotificationService,
-		/** In the desktop app an offline mirror keeps unsaved edits, so a lost connection is not worth a warning. */
-		private readonly connectionLossExpected = false,
 	)
 	{
 		this.subscription = this.saveSubject.pipe(
@@ -30,9 +28,6 @@ export class SettingsApiDataBackend implements DataBackend<Settings>, SyncReport
 			concatMap(settings => this.put(settings).pipe(
 				catchError(err => {
 					console.error('Settings API sync failed:', err);
-					if (this.connectionLossExpected && err instanceof HttpErrorResponse && err.status === 0) {
-						return of(void 0);
-					}
 					this.notifications.show('Could not save your settings to your account. They work here, but are lost when you close the page.', 10_000);
 					return of(void 0);
 				}),

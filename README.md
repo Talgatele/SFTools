@@ -55,25 +55,6 @@ docker compose up --build
 
 Then visit `http://localhost:8080/`. See [docs/docker.md](docs/docker.md) for Docker CLI usage and deployment details.
 
-## Desktop app
-
-A Tauri wrapper around the same bundle, released on every push to master.
-Installers are published next to the API; the app updates itself from there.
-
-### Code signing
-
-Windows installers are built by GitHub Actions from this repository
-(`.github/workflows/ci.yml`) and signed with a Certum code signing certificate. macOS
-builds are ad-hoc signed and not notarized, so macOS asks for "Open Anyway" in
-System Settings → Privacy & Security on first launch.
-
-### Privacy
-
-This local-only build has no sign-in, account sync, or analytics. Plans and
-settings are stored on this device. The app still connects to the configured
-API to load game data and public versions, create shared links, and check
-desktop-app updates.
-
 ## License
 
 [MIT](LICENSE). Satisfactory is made by Coffee Stain Studios; game icons and

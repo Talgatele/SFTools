@@ -1,15 +1,10 @@
-import {Injectable, Optional, Signal, computed} from '@angular/core';
+import {Injectable, Signal, computed} from '@angular/core';
 import {toObservable} from '@angular/core/rxjs-interop';
 import {filter, take} from 'rxjs/operators';
 import {SharesApiService} from '@src/Model/API/SharesApiService';
 import {SharePayload} from '@src/Model/API/Schema/Shares/SharePayload';
 import {AuthService} from '@src/Model/Auth/AuthService';
-import {DesktopBridge} from '@src/Model/Desktop/DesktopBridge';
-import {ConnectivityService} from '@src/Model/Network/ConnectivityService';
 import {NotificationService} from '@src/Model/NotificationService';
-import {DataBackend} from '@src/Model/Sync/DataBackend';
-import {OfflineMirrorBackend} from '@src/Model/Sync/OfflineMirrorBackend';
-import {PreferRemoteOfflineMerger} from '@src/Model/Sync/PreferRemoteOfflineMerger';
 import {LocalStorageDataBackend} from '@src/Model/Sync/LocalStorageDataBackend';
 import {SyncableService} from '@src/Model/Sync/SyncableService';
 import {MergeVisitedSharesConflictResolver} from '@src/Model/Shares/MergeVisitedSharesConflictResolver';
@@ -33,27 +28,13 @@ export class VisitedSharesManager extends SyncableService<VisitedShareStore>
 		notifications: NotificationService,
 		private readonly shareTrees: ShareTreeCache,
 		storage: AppStorage,
-		connectivity: ConnectivityService,
-		@Optional() desktop: DesktopBridge | null,
 	)
 	{
 		const apiBackend = new VisitedSharesApiDataBackend(sharesApi, notifications);
-		// Offline the desktop app shows the list as last loaded.
-		const remoteBackend: DataBackend<VisitedShareStore> = desktop === null ? apiBackend : new OfflineMirrorBackend<VisitedShareStore>(
-			apiBackend,
-			null,
-			storage,
-			'visitedShares',
-			() => '',
-			new PreferRemoteOfflineMerger<VisitedShareStore>(),
-			connectivity,
-			notifications,
-			'shared plans',
-		);
 		super(
 			authService,
 			new LocalStorageDataBackend<VisitedShareStore>(storage, 'sftools.visitedShares'),
-			remoteBackend,
+			apiBackend,
 			new MergeVisitedSharesConflictResolver(),
 			{shares: []},
 			notifications,
@@ -86,7 +67,7 @@ export class VisitedSharesManager extends SyncableService<VisitedShareStore>
 		});
 	}
 
-	/** A repeat visit keeps visitedAt as is, so it neither re-syncs nor reorders the list; it only fills in a missing icon and the supporter flag. */
+	/** A repeat visit keeps visitedAt as is, so it neither re-syncs nor reorders the list; it only fills in a missing icon. */
 	public recordVisit(payload: SharePayload): void
 	{
 		if (!this.loaded()) {
@@ -95,11 +76,10 @@ export class VisitedSharesManager extends SyncableService<VisitedShareStore>
 		}
 		const existing = this.data().shares.find(share => share.share === payload.share);
 		if (existing) {
-			const sharedBySupporter = payload.sharedBySupporter === true;
 			const fillIcon = existing.iconClassName === undefined && payload.type === 'plan';
-			if (fillIcon || (existing.sharedBySupporter === true) !== sharedBySupporter) {
+			if (fillIcon) {
 				const iconClassName = fillIcon ? this.shareTrees.buildTree(payload).iconClassName : existing.iconClassName;
-				this.persist({shares: this.data().shares.map(share => share === existing ? {...share, iconClassName, sharedBySupporter} : share)});
+				this.persist({shares: this.data().shares.map(share => share === existing ? {...share, iconClassName} : share)});
 			}
 			return;
 		}
@@ -111,7 +91,6 @@ export class VisitedSharesManager extends SyncableService<VisitedShareStore>
 			visitedAt: new Date().toISOString(),
 			version: payload.version,
 			iconClassName: payload.type === 'plan' ? this.shareTrees.buildTree(payload).iconClassName : undefined,
-			sharedBySupporter: payload.sharedBySupporter === true,
 		};
 		this.persist({shares: [entry, ...this.data().shares].slice(0, VISITED_SHARES_CAP)});
 	}

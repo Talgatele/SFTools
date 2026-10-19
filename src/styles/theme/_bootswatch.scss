@@ -1,7 +1,7 @@
 // Superhero 5.2.0
 // Bootswatch
 
-// Lato is bundled (styles.scss) - the desktop app has to work offline.
+// Lato is bundled locally in styles.scss.
 $web-font-path: false !default;
 @if $web-font-path {
 	@import url($web-font-path);

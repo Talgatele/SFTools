@@ -104,16 +104,11 @@ final class PageHeadInjector
 			$this->tag('property', 'og:title', $meta['title']),
 			$this->tag('property', 'og:description', $meta['description']),
 			$this->tag('property', 'og:image', $image),
-			// "summary": icons and the logo are small squares that a large card would stretch.
-			$this->tag('name', 'twitter:card', 'summary'),
-			$this->tag('name', 'twitter:title', $meta['title']),
-			$this->tag('name', 'twitter:description', $meta['description']),
-			$this->tag('name', 'twitter:image', $image),
 		];
 
 		// Matched by tag rather than by markers: the Angular build may rewrite comments and line breaks.
 		$html = (string) preg_replace('~[ \t]*<title>.*?</title>[ \t]*(?:\r?\n)?~is', '', $html);
-		$html = (string) preg_replace('~[ \t]*<meta\s+(?:name|property)="(?:description|og:[^"]*|twitter:[^"]*)"[^>]*>[ \t]*(?:\r?\n)?~i', '', $html);
+		$html = (string) preg_replace('~[ \t]*<meta\s+(?:name|property)="(?:description|og:[^"]*)"[^>]*>[ \t]*(?:\r?\n)?~i', '', $html);
 
 		$block = "\n\t" . implode("\n\t", $tags);
 		$count = 0;

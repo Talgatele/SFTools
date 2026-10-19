@@ -8,7 +8,6 @@ import {CollapseModule} from 'ngx-bootstrap/collapse';
 import {NavbarVersionSwitcherComponent} from '@src/Components/Root/NavbarVersionSwitcherComponent';
 import {NavbarSearchComponent} from '@src/Components/Root/NavbarSearchComponent';
 import {MobileSearchComponent} from '@src/Components/Root/MobileSearchComponent';
-import {NavbarCommunityLinksComponent} from '@src/Components/Root/NavbarCommunityLinksComponent';
 import {AppTooltipDirective} from '@src/Components/Common/AppTooltipDirective';
 import {VersionManager} from '@src/Model/Data/VersionManager';
 import {HelpManager} from '@src/Model/Help/HelpManager';
@@ -28,13 +27,9 @@ import {BackToPlannerResolver} from '@src/Model/Planner/BackToPlannerResolver';
 		NavbarVersionSwitcherComponent,
 		NavbarSearchComponent,
 		MobileSearchComponent,
-		NavbarCommunityLinksComponent,
 		AppTooltipDirective,
 	],
 	styles: `
-		.navbar-supporter {
-			background: linear-gradient(100deg, #8a5d0e 0%, #a87a19 45%, #b98a24 70%, #976a12 100%);
-		}
 		.navbar-shortcut,
 		.navbar-toggler {
 			--bs-btn-color: #fff;

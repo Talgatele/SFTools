@@ -326,8 +326,8 @@ export class PlanExportDialogComponent implements OnInit
 			const roots = this.treeBuilder.build(this.tree().entries, this.selection());
 			const content = await this.writer.write(roots, version);
 			const fileName = this.downloader.safeName(this.nameSignal().trim() || this.suggestedName(), 'sft', 'Satisfactory Tools plans');
-			const savedPath = await this.downloader.download(new Blob([content], {type: 'application/octet-stream'}), fileName, true);
-			this.notifications.showSuccess(savedPath === null ? `Downloaded ${fileName}.` : `Saved to ${savedPath}.`);
+			await this.downloader.download(new Blob([content], {type: 'application/octet-stream'}), fileName);
+			this.notifications.showSuccess(`Downloaded ${fileName}.`);
 			this.dialogs.closeExport();
 		} catch (error) {
 			this.errorSignal.set(`Could not export the plans: ${(error as Error).message}`);

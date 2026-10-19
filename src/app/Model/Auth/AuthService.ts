@@ -11,7 +11,7 @@ export class AuthService
 	public readonly accessToken: Signal<string | null>;
 	public readonly currentLogin: Signal<string | null>;
 	public readonly isAuthenticated: Signal<boolean>;
-	/** Third-party sign-ins have no username: their stored login is a "via Discord" placeholder, so this is null for them. */
+	/** Signed-in profiles may not have a username. */
 	public readonly displayName: Signal<string | null>;
 
 	public constructor()

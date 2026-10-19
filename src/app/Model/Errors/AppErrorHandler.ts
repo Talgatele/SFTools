@@ -1,11 +1,9 @@
-import {ErrorHandler, Injectable, Optional} from '@angular/core';
+import {ErrorHandler, Injectable} from '@angular/core';
 import {HttpErrorResponse} from '@angular/common/http';
-import {DesktopBridge} from '@src/Model/Desktop/DesktopBridge';
 import {ApiCallLog} from '@src/Model/Errors/ApiCallLog';
 import {ErrorClassifier} from '@src/Model/Errors/ErrorClassifier';
 import {ErrorPopup} from '@src/Model/Errors/ErrorPopup';
 import {ErrorRedactor} from '@src/Model/Errors/ErrorRedactor';
-import {ErrorReporter} from '@src/Model/Errors/ErrorReporter';
 
 @Injectable()
 export class AppErrorHandler extends ErrorHandler
@@ -17,10 +15,8 @@ export class AppErrorHandler extends ErrorHandler
 	public constructor(
 		private readonly classifier: ErrorClassifier,
 		private readonly popup: ErrorPopup,
-		private readonly reporter: ErrorReporter,
 		private readonly apiCalls: ApiCallLog,
 		private readonly redactor: ErrorRedactor,
-		@Optional() private readonly desktop: DesktopBridge | null,
 	)
 	{
 		super();
@@ -47,14 +43,6 @@ export class AppErrorHandler extends ErrorHandler
 			const details = this.redactor.redact(this.details(original, summary));
 			const signature = kind === 'update' ? 'update' : summary.slice(0, 300);
 			this.popup.show({kind, signature, details});
-			if (kind === 'report') {
-				// A rejection here would come back to handleError as an unhandled rejection - and report itself.
-				this.reporter.report(summary, details, this.build()).then(sent => {
-					if (sent) {
-						this.popup.markReported(signature);
-					}
-				}).catch((failure: unknown) => console.error('Could not mark the error as reported:', failure));
-			}
 		} catch (failure) {
 			console.error('Could not show the error:', failure);
 		}
@@ -89,12 +77,11 @@ export class AppErrorHandler extends ErrorHandler
 
 	private details(error: unknown, summary: string): string
 	{
-		const app = this.desktop === null ? 'website' : `desktop ${this.desktop.info.version} (${this.desktop.info.platform})`;
 		return [
 			`Message: ${summary}`,
 			`Page: ${window.location.href}`,
 			`Time: ${new Date().toISOString()}`,
-			`App: ${app}`,
+			'App: website',
 			`Build: ${this.build()}`,
 			`Browser: ${navigator.userAgent}`,
 			...(error instanceof HttpErrorResponse ? [`Response: ${this.apiCalls.errorBody(error.error)}`] : []),
@@ -114,5 +101,4 @@ export class AppErrorHandler extends ErrorHandler
 		const script = document.querySelector<HTMLScriptElement>('script[src*="main"]');
 		return script?.src.split('/').pop() ?? 'unknown';
 	}
-
 }

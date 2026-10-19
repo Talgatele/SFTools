@@ -3,7 +3,6 @@ import {DatePipe, NgTemplateOutlet} from '@angular/common';
 import {FaIconComponent} from '@fortawesome/angular-fontawesome';
 import {BsDropdownModule} from 'ngx-bootstrap/dropdown';
 import {AppTooltipDirective} from '@src/Components/Common/AppTooltipDirective';
-import {SupporterBadgeComponent} from '@src/Components/Supporters/SupporterBadgeComponent';
 import {InfoNoteComponent} from '@src/Components/Common/InfoNoteComponent';
 import {CalculatorTabsMode} from '@src/Components/Planner/Panels/Calculator/CalculatorTabsMode';
 import {faCopy, faDownload, faEllipsis, faFileImport, faLock, faPlay, faRotateLeft, faShareNodes, faSitemap, faSliders, faXmark} from '@fortawesome/free-solid-svg-icons';
@@ -47,7 +46,6 @@ import {SettingsGroups} from '@src/Model/Planner/SettingsGroups';
 import {ShareDialogService} from '@src/Components/Planner/Share/ShareDialogService';
 import {ActiveShareManager} from '@src/Model/Shares/ActiveShareManager';
 import {ActivePlanLinkManager} from '@src/Model/PlanLinks/ActivePlanLinkManager';
-import {AppPlatform} from '@src/Model/Desktop/AppPlatform';
 import {CalculatorQuickStartComponent} from '@src/Components/Planner/Panels/Calculator/CalculatorQuickStartComponent';
 
 @Component({
@@ -74,7 +72,6 @@ import {CalculatorQuickStartComponent} from '@src/Components/Planner/Panels/Calc
 		InfoNoteComponent,
 		LoadFromSaveDialogComponent,
 		AppTooltipDirective,
-		SupporterBadgeComponent,
 	],
 	styles: [`
 		.req-controls {
@@ -253,7 +250,6 @@ export class CalculatorComponent implements OnDestroy
 	public constructor(
 		private readonly planManager: PlanManager,
 		public readonly planNames: PlanNameResolver,
-		protected readonly platform: AppPlatform,
 		private readonly notifications: NotificationService,
 		public readonly actions: PlannerActionsService,
 		public readonly hotkeys: HotkeyService,

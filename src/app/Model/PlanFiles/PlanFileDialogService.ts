@@ -5,7 +5,7 @@ import {PlanExportRequest} from '@src/Model/PlanFiles/PlanExportRequest';
 import {PlanFileContent} from '@src/Model/PlanFiles/PlanFileContent';
 import {SftContainer} from '@src/Model/PlanFiles/SftContainer';
 
-/** Root-scoped because files arrive from outside the planner too (desktop file association); the planner renders the dialogs. */
+/** Root-scoped because files can be imported from outside the planner; the planner renders the dialogs. */
 @Injectable({providedIn: 'root'})
 export class PlanFileDialogService
 {

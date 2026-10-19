@@ -1,14 +1,7 @@
-import {Injectable, Optional, Signal, computed} from '@angular/core';
-import {toObservable} from '@angular/core/rxjs-interop';
-import {filter, skip} from 'rxjs/operators';
+import {Injectable, Signal, computed} from '@angular/core';
 import {AuthService} from '@src/Model/Auth/AuthService';
 import {SettingsApiService} from '@src/Model/API/SettingsApiService';
-import {DesktopBridge} from '@src/Model/Desktop/DesktopBridge';
-import {ConnectivityService} from '@src/Model/Network/ConnectivityService';
 import {NotificationService} from '@src/Model/NotificationService';
-import {DataBackend} from '@src/Model/Sync/DataBackend';
-import {OfflineMirrorBackend} from '@src/Model/Sync/OfflineMirrorBackend';
-import {PreferLocalOfflineMerger} from '@src/Model/Sync/PreferLocalOfflineMerger';
 import {LocalStorageDataBackend} from '@src/Model/Sync/LocalStorageDataBackend';
 import {SyncableService} from '@src/Model/Sync/SyncableService';
 import {PanelLayoutState} from '@src/Components/Planner/Panel/PanelLayoutState';
@@ -46,41 +39,17 @@ export class SettingsManager extends SyncableService<Settings>
 		notifications: NotificationService,
 		conflictService: SettingsConflictService,
 		storage: AppStorage,
-		connectivity: ConnectivityService,
-		@Optional() desktop: DesktopBridge | null,
 	)
 	{
-		const apiBackend = new SettingsApiDataBackend(settingsApiService, notifications, desktop !== null);
-		// The desktop app keeps the account's settings while offline.
-		const remoteBackend: DataBackend<Settings> = desktop === null ? apiBackend : new OfflineMirrorBackend<Settings>(
-			apiBackend,
-			apiBackend,
-			storage,
-			'settings',
-			() => '',
-			new PreferLocalOfflineMerger<Settings>(),
-			connectivity,
-			notifications,
-			'settings',
-		);
 		super(
 			authService,
 			new LocalStorageDataBackend<Settings>(storage, 'sftools.settings'),
-			remoteBackend,
+			new SettingsApiDataBackend(settingsApiService, notifications),
 			new InteractiveSettingsConflictResolver(conflictService),
 			SettingsDefaults.SETTINGS,
 			notifications,
 			'settings',
 		);
-
-		// Back online: the reload is what sends the edits made offline.
-		if (desktop !== null) {
-			toObservable(connectivity.online).pipe(skip(1), filter(online => online)).subscribe(() => {
-				if (authService.isAuthenticated()) {
-					this.reload();
-				}
-			});
-		}
 	}
 
 	public updateNumbers(patch: Partial<NumberSettings>): void
