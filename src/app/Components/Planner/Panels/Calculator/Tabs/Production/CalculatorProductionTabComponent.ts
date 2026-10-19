@@ -72,7 +72,7 @@ export class CalculatorProductionTabComponent implements OnDestroy
 
 	private blankRow(): ProductionRequest
 	{
-		return {itemClassName: '', ratePerMinute: 10};
+		return {itemClassName: '', ratePerMinute: 0, mode: 'satisfactory'};
 	}
 
 	public get availableItems(): Item[]
@@ -112,7 +112,7 @@ export class CalculatorProductionTabComponent implements OnDestroy
 
 	public get hasSatisfactoryMode(): boolean
 	{
-		return this.rows.some(row => this.modeOf(row) === 'satisfactory');
+		return this.rows.some(row => row.itemClassName !== '' && this.modeOf(row) === 'satisfactory');
 	}
 
 	/** Omitting the default keeps requests saved before maximise existed byte-identical. */
@@ -188,7 +188,7 @@ export class CalculatorProductionTabComponent implements OnDestroy
 
 	public get showSloopWarning(): boolean
 	{
-		return this.rows.some(row => this.modeOf(row) !== 'rate')
+		return this.rows.some(row => row.itemClassName !== '' && this.modeOf(row) !== 'rate')
 			&& (this.planManager.activeSettings()?.maxSloops ?? 0) > 0;
 	}
 
