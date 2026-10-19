@@ -22,7 +22,7 @@ The current build is local-only for accounts: `Model/Auth/AuthService.ts` always
 | Save parsing | `@etothepii/satisfactory-file-parser` `^4.1.1`, in a separate module worker |
 | Markdown | `marked` `^18.0.13` |
 | Active build | `@angular/build:application` and `@angular/build:dev-server` in `angular.json` |
-| Reference Node runtime | Node 24 in CI and Docker; use this for reproducibility |
+| Reference Node runtime | Node 24 in CI and Docker; current Angular packages require at least 24.15.0 on this line |
 | Production web layer | PHP 8.3 + Apache in Docker; static Angular output plus metadata injection |
 | Package manager | npm, committed `package-lock.json`, `.npmrc` sets `legacy-peer-deps=true` |
 
@@ -51,13 +51,14 @@ Open `http://localhost:4200/`. `env.ts` is gitignored; preserve an existing deve
 | `npm start` | Development server; development configuration is the serve default |
 | `npm run watch` | Development build in watch mode, without a server |
 | `npm run build` | Production build, output directly in `dist/` |
+| `npm run test:satisfactory` | Node domain regressions using synthetic recipe fixtures and real HiGHS, including rounding, custom rates and cancellation |
 | `npm run ng -- build --configuration development` | Single development build |
 | `php -l deploy/web/index.php` | PHP syntax validation, also run by CI |
 | `docker compose up --build` | Build and serve on `http://localhost:8080/` |
 
 Production replaces `src/env/env.ts` with `src/env/env.prod.ts`. Frontend URLs are build-time values, not container runtime settings. `SFTOOLS_PORT` changes the Compose host port. See [Docker instructions](docker.md).
 
-**Validation gap:** `package.json` has `npm test` (`ng test`), but `angular.json` has no test target and the reviewed tree contains no test/spec files. There is also no npm lint script. Do not report these as passing checks or assume a test runner is available. The existing automated baseline is the Angular production build plus PHP syntax validation.
+**Validation gap:** `package.json` has `npm test` (`ng test`), but `angular.json` has no Angular test target. The focused `test:satisfactory` script uses Node's test runner and a TypeScript import hook independently of Angular's browser tooling. There is no npm lint script. The general automated baseline remains the Angular production build plus PHP syntax validation; the domain tests do not verify browser interaction or the full live game dataset.
 
 ## 4. Codespace map
 
@@ -117,6 +118,8 @@ All entries in this table are under `src/app/` unless otherwise stated.
 
 Custom matchers intentionally reuse planner/Codex/help components as internal paths change. Route changes therefore need to update state on navigation, not only at construction. Reserved top-level routes must precede `:versionSlug`. `main.ts` rewrites old hashbang links before routing.
 
+The Request tab guide (`tab-request`) is bundled in `src/assets/help/tab-request.json`, with search/topic metadata in `Model/Help/BundledHelp.ts`. `HelpManager` merges that metadata into the external manifest and serves the local article first, including when the external help service is unavailable. It documents fixed rates, maximise and Satisfactory mode together; the Request table's Rate help icon opens this guide. Other articles continue to use the external service.
+
 ## 6. Runtime data flow and contracts
 
 ### Startup and game data
@@ -134,6 +137,9 @@ The planner supplies a `Plan` and optional locked nodes to `ProductionSolverServ
 Keep these layers separate: a solver result is not an X6 cell tree, and graph presentation is not the optimisation model. Inspect `GraphComposer`, `GraphReconciler`, `GraphEdgeBuilder` and the selected calculation mode when a re-solve unexpectedly replaces user edits.
 
 Solver implementation details that matter:
+
+- Satisfactory item requests use `SatisfactoryTargets` to derive production depth from standard machine recipes. Space Elevator class IDs target the throughput of two machines at 100% (4 Smart Plating/min, 10 Versatile Framework/min). For these parts, an enabled standard recipe takes precedence over alternates throughout the calculation; alternates remain available when the standard recipe is explicitly disabled or unavailable. The top two other depths target two recipe batches per minute, intermediates five, and basic items share the remaining capacity. Enabled production routes determine batch sizes, including alternates for other items. Automatic rates are rebuilt at clean whole/half/one-decimal values where possible; sub-0.1 rates retain their maximum. Each capped target is reserved in hierarchy order, so a resource shortage can reduce later targets to zero. `ProductionRequest.satisfactoryOverride` is an optional fixed rate reserved before automatic allocation; absence preserves automatic behavior for older plans. The request serializers preserve this optional field directly. Power and sink-point Satisfactory targets retain the existing maximise-and-round behavior.
+- Automatic plan icons use the same cached standard-recipe production depths, prioritising Space Elevator outputs and then the deepest requested item (or graph output for plans without item requests). Request order does not affect the icon. `PlanIconResolver` refreshes automatic icons when displaying older stored plans; custom icons and explicit no-icon selections are preserved. Automatic plan names still follow the first product.
 
 - `SolverService` has a 90-second default timeout. Unsubscribing from a pending solve terminates/replaces the worker because HiGHS runs synchronously within it. Preserve cancellation and request-ID behavior.
 - `SolverWorker.ts` fetches `/assets/highs.js`, patches its output precision, imports it through a Blob URL, and locates WASM under `/assets`. `angular.json` copies both files from `node_modules/highs/build`.

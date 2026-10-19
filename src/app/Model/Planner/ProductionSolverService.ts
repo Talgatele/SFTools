@@ -42,6 +42,7 @@ import {ProductNode} from '@src/Model/Planner/Solver/Response/ProductNode';
 import {RecipeNode} from '@src/Model/Planner/Solver/Response/RecipeNode';
 import {SinkNode} from '@src/Model/Planner/Solver/Response/SinkNode';
 import {SubplanNode} from '@src/Model/Planner/Solver/Response/SubplanNode';
+import {preferSpaceElevatorRecipes, satisfactoryRecipeRate, satisfactoryTargets} from '@src/Model/Planner/SatisfactoryTargets';
 
 @Injectable({providedIn: 'root'})
 export class ProductionSolverService
@@ -742,6 +743,9 @@ export class ProductionSolverService
 		}
 
 		lines.push('\nBounds');
+		if (request.maximise?.maximumRate !== undefined) {
+			lines.push('MaxRate <= ' + request.maximise.maximumRate);
+		}
 		byproducts.forEach(byproduct => {
 			lines.push(byproduct + '@Byproduct >= 0');
 		});
@@ -865,7 +869,9 @@ export class ProductionSolverService
 	{
 		return new Observable<SolverResponse>(subscriber => {
 			const run: SolveRunHandle = {cancelled: false, cancelCurrent: null};
-			this.runMaximiseRounds(plan, data, base, maximise, lockedNodes, run)
+			(maximise.satisfactory && maximise.category === 'items'
+				? this.runSatisfactory(plan, data, base, maximise, lockedNodes, run)
+				: this.runMaximiseRounds(plan, data, base, maximise, lockedNodes, run))
 				.then(response => {
 					subscriber.next(response);
 					subscriber.complete();
@@ -880,6 +886,76 @@ export class ProductionSolverService
 				run.cancelCurrent?.();
 			};
 		});
+	}
+
+	private async runSatisfactory(
+		plan: Plan, data: Data, base: SolverRequest, maximise: MaximiseTarget, lockedNodes: Node[], run: SolveRunHandle,
+	): Promise<SolverResponse>
+	{
+		const rows = plan.requests.filter(row => row.mode === 'satisfactory' && row.itemClassName !== '');
+		const achieved: Record<string, number> = {};
+		let request: SolverRequest = {...base, recipes: preferSpaceElevatorRecipes(base.recipes), productions: [...base.productions]};
+		for (const row of rows) {
+			if (row.satisfactoryOverride === undefined) continue;
+			if (!Number.isFinite(row.satisfactoryOverride) || row.satisfactoryOverride < 0) {
+				throw new Error('Custom Satisfactory rates must be finite, non-negative numbers.');
+			}
+			request.productions.push({item: data.getItemByClassName(row.itemClassName), amount: row.satisfactoryOverride});
+			achieved[row.itemClassName] = row.satisfactoryOverride;
+		}
+		const automatic = maximise.items.filter(item => rows.some(row => row.itemClassName === item.className
+			&& row.satisfactoryOverride === undefined));
+		const targets = satisfactoryTargets(data, request.recipes, automatic);
+		for (const target of targets.filter(target => target.rate !== null)) {
+			let cap = target.rate!;
+			// Inspect the selected route for its batch size or elevator throughput.
+			let solution: HighsSolution;
+			for (let attempt = 0; ; attempt++) {
+				const probe: SolverRequest = {...request, maximise: {
+					category: 'items', items: [target.item], satisfactory: false, maximumRate: cap,
+				}};
+				solution = await this.awaitSolve(this.buildLp(probe, data, lockedNodes), this.solveOptions(probe, plan), run);
+				if (this.mapStatus(solution.Status) !== 'Optimal') {
+					return {status: this.mapStatus(solution.Status), nodes: [], achievedMaximums: achieved};
+				}
+				const candidateRate = this.cleanProductionRate(Math.max(0, this.columnsOf(solution).get('MaxRate') ?? 0));
+				const routeRequest: SolverRequest = {...request, maximise: null,
+					productions: [...request.productions, {item: target.item, amount: candidateRate}]};
+				const route = await this.awaitSolve(this.buildLp(routeRequest, data, lockedNodes), this.solveOptions(routeRequest, plan), run);
+				if (this.mapStatus(route.Status) !== 'Optimal') {
+					return {status: this.mapStatus(route.Status), nodes: [], achievedMaximums: achieved};
+				}
+				const used = this.nodesFromColumns(this.columnsOf(route), data, this.groupingModes.resolve(plan.settings))
+					.filter((node): node is RecipeNode => node instanceof RecipeNode && node.target > 1e-6
+						&& node.recipe.products.some(product => product.item === target.item))
+					.sort((a, b) => b.target - a.target)[0];
+				const selectedCap = used === undefined ? cap : satisfactoryRecipeRate(used.recipe, target.item, target.multiplier);
+				if (attempt >= 1 || selectedCap === cap) break;
+				cap = selectedCap;
+			}
+			const maximum = Math.max(0, this.columnsOf(solution).get('MaxRate') ?? 0);
+			const rate = this.cleanProductionRate(Math.min(cap, maximum));
+			request = {...request, maximise: null, productions: [...request.productions, {item: target.item, amount: rate}]};
+			achieved[target.item.className] = rate;
+		}
+		const remaining = maximise.items.filter(item => !Object.hasOwn(achieved, item.className));
+		if (remaining.length > 0) {
+			const response = await this.runMaximiseRounds(plan, data, request,
+				{category: 'items', items: remaining, satisfactory: false}, lockedNodes, run);
+			if (response.status !== 'Optimal') return response;
+			for (const item of remaining) {
+				const maximum = response.achievedMaximums?.[item.className] ?? 0;
+				// Ordinary maximise rows retain their exact result in mixed imported plans.
+				const rate = rows.some(row => row.itemClassName === item.className) ? this.cleanProductionRate(maximum) : maximum;
+				request.productions.push({item, amount: rate});
+				achieved[item.className] = rate;
+			}
+		}
+		// Rebuild from all targets together: rounded rates must change the factory,
+		// and cancellation must still terminate the active worker.
+		const solution = await this.awaitSolve(this.buildLp(request, data, lockedNodes), this.solveOptions(request, plan), run);
+		const response = this.parseSolution(solution, data, this.groupingModes.resolve(plan.settings));
+		return {...response, nodes: [...response.nodes, ...this.augmenterNodes(plan, data)], achievedMaximums: achieved};
 	}
 
 	private async runMaximiseRounds(

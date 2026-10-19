@@ -55,10 +55,12 @@ export class SubplanScaler
 			this.planManager.setGraph(planId, this.scaledGraph(graph, factor, plan.settings));
 		}
 
-		// Maximise rows carry no rate to scale - they ask for "as much as possible".
+		// Automatic rows have no fixed rate; explicit Satisfactory overrides scale with the factory.
 		this.planManager.setRequests(planId, plan.requests.map(request => (request.mode ?? 'rate') === 'rate'
 			? {...request, ratePerMinute: request.ratePerMinute * factor}
-			: {...request}));
+			: request.mode === 'satisfactory' && request.satisfactoryOverride !== undefined
+				? {...request, satisfactoryOverride: request.satisfactoryOverride * factor}
+				: {...request}));
 		this.planManager.setInputs(planId, plan.inputs.map(input => ({...input, amount: input.amount * factor})));
 	}
 

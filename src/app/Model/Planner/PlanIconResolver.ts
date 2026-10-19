@@ -20,8 +20,9 @@ export class PlanIconResolver
 		if (!data) {
 			return null;
 		}
-		// Undefined only on plans saved before icons were stored, e.g. old shares nobody can re-save.
-		const className = plan.iconClassName === undefined ? this.labels.generatedIcon(plan) : plan.iconClassName;
+		// Resolve automatic icons from current outputs, including stored plans not yet edited
+		// since the hierarchy changed. Manual icons and explicit "no icon" remain unchanged.
+		const className = this.labels.assign(plan).iconClassName ?? null;
 		return className === null ? null : data.iconForClassName(className);
 	}
 

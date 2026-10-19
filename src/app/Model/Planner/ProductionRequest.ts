@@ -8,6 +8,8 @@ export interface ProductionRequest
 	ratePerMinute: number;
 	/** Absent on requests saved before maximise existed. */
 	mode?: ProductionRequestMode;
+	/** An explicit Satisfactory-mode rate; absent means automatic (including older plans). */
+	satisfactoryOverride?: number;
 	/** Input unit only: ratePerMinute stays in MW. */
 	powerUnit?: PowerUnit;
 }

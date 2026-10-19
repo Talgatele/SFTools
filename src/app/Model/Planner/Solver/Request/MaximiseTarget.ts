@@ -7,5 +7,7 @@ export interface MaximiseTarget
 	category: MaximiseCategory;
 	items: Item[];
 	satisfactory: boolean;
+	/** Optional ceiling for a recipe-based Satisfactory target. */
+	maximumRate?: number;
 
 }

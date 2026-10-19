@@ -488,7 +488,12 @@ export class PlanManager extends SyncableService<PlanStore>
 
 	public createPlan(name: string = '', folderId: string | null = null): Plan
 	{
-		return this.insertPlan(name, folderId, null, this.effectiveFolderSettings(folderId));
+		let settings = this.effectiveFolderSettings(folderId);
+		const resources = this.versionManager.activeVersionData()?.resources;
+		if (resources && !this.folderFixesGroup(folderId, 'resources')) {
+			settings = {...settings, disabledResources: [...resources]};
+		}
+		return this.insertPlan(name, folderId, null, settings);
 	}
 
 	public fixedFolderForFolder(folderId: string | null): Folder | null
@@ -1066,6 +1071,25 @@ export class PlanManager extends SyncableService<PlanStore>
 		return null;
 	}
 
+	private folderFixesGroup(folderId: string | null, group: SettingsGroup): boolean
+	{
+		const folders = this.folders();
+		const seen = new Set<string>();
+		let id = folderId;
+		while (id !== null && !seen.has(id)) {
+			seen.add(id);
+			const folder = folders.find(candidate => candidate.id === id);
+			if (!folder) {
+				return false;
+			}
+			if (folder.fixedGroups.includes(group)) {
+				return true;
+			}
+			id = folder.parentId;
+		}
+		return false;
+	}
+
 	public static bySiblingOrder(a: {order?: number; name: string}, b: {order?: number; name: string}): number
 	{
 		const orderA = a.order ?? Number.POSITIVE_INFINITY;
@@ -1320,16 +1344,22 @@ export class PlanManager extends SyncableService<PlanStore>
 
 	public defaultSettings(): PlanSettings
 	{
-		// Water stays unlimited: its extractors need no node.
-		const worldLimits = this.versionManager.activeVersionData()?.worldLimits ?? null;
+		// Water has no map limit because its extractors need no node.
+		const data = this.versionManager.activeVersionData();
+		const worldLimits = data?.worldLimits ?? null;
+		const disabledResources = data?.resources ?? [];
 		if (worldLimits === null) {
-			return {calculationMode: 'automatic'};
+			return {
+				calculationMode: 'automatic',
+				...(disabledResources.length > 0 ? {disabledResources: [...disabledResources]} : {}),
+			};
 		}
 		const limits = {...worldLimits};
 		delete limits[SpecialClasses.WaterItem];
 		return {
 			calculationMode: 'automatic',
 			...(Object.keys(limits).length > 0 ? {resourceLimits: limits} : {}),
+			...(disabledResources.length > 0 ? {disabledResources: [...disabledResources]} : {}),
 		};
 	}
 

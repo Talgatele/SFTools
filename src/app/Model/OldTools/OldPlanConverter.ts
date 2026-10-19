@@ -127,6 +127,8 @@ export class OldPlanConverter
 	{
 		const settings: PlanSettings = {
 			...this.planManager.defaultSettings(),
+			// Imported plans used the old defaults with every raw resource available.
+			disabledResources: undefined,
 			// The old solver optimised weighted raw resources only.
 			optimisation: {rawResources: true, power: false},
 		};

@@ -5,6 +5,7 @@ import {FormsModule} from '@angular/forms';
 import {FaIconComponent} from '@fortawesome/angular-fontawesome';
 import {faXmark} from '@fortawesome/free-solid-svg-icons';
 import {InfoNoteComponent} from '@src/Components/Common/InfoNoteComponent';
+import {HelpButtonComponent} from '@src/Components/Help/HelpButtonComponent';
 import {ItemPickerComponent} from '@src/Components/Common/ItemPickerComponent';
 import {ItemPickerOption} from '@src/Components/Common/ItemPickerOption';
 import {Item} from '@src/Model/Data/Entities/Item';
@@ -23,7 +24,10 @@ import {VersionManager} from '@src/Model/Data/VersionManager';
 	selector: 'calculator-production-tab',
 	templateUrl: './CalculatorProductionTabComponent.html',
 	changeDetection: ChangeDetectionStrategy.Eager,
-	imports: [FormsModule, FaIconComponent, ItemPickerComponent, InfoNoteComponent],
+	imports: [FormsModule, FaIconComponent, ItemPickerComponent, InfoNoteComponent, HelpButtonComponent],
+	styles: [`
+		tr.custom-rate-row > td { vertical-align: top !important; }
+	`],
 })
 export class CalculatorProductionTabComponent implements OnDestroy
 {
@@ -99,6 +103,7 @@ export class CalculatorProductionTabComponent implements OnDestroy
 	public onItemChange(row: ProductionRequest, value: string): void
 	{
 		row.itemClassName = value;
+		row.satisfactoryOverride = undefined;
 		if (value !== this.powerTargetClass) {
 			row.powerUnit = undefined;
 		}
@@ -110,15 +115,30 @@ export class CalculatorProductionTabComponent implements OnDestroy
 		return row.mode ?? 'rate';
 	}
 
-	public get hasSatisfactoryMode(): boolean
-	{
-		return this.rows.some(row => row.itemClassName !== '' && this.modeOf(row) === 'satisfactory');
-	}
-
 	/** Omitting the default keeps requests saved before maximise existed byte-identical. */
 	public setMode(row: ProductionRequest, mode: ProductionRequestMode): void
 	{
 		row.mode = mode === 'rate' ? undefined : mode;
+		row.satisfactoryOverride = undefined;
+		this.sync();
+	}
+
+	public satisfactoryRateOf(row: ProductionRequest): number | null
+	{
+		return row.satisfactoryOverride
+			?? this.planManager.activePlan()?.metadata?.achievedMaximums?.[row.itemClassName] ?? null;
+	}
+
+	public setSatisfactoryRate(row: ProductionRequest, value: number | null): void
+	{
+		if (value === null || !Number.isFinite(value) || value < 0) return;
+		row.satisfactoryOverride = value;
+		this.sync();
+	}
+
+	public resetSatisfactoryRate(row: ProductionRequest): void
+	{
+		row.satisfactoryOverride = undefined;
 		this.sync();
 	}
 

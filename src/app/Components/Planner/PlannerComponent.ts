@@ -467,7 +467,8 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 					mode: this.modeOf(plan),
 					requestsKey: JSON.stringify({
 						// powerUnit is display-only - must not re-solve.
-						requests: plan.requests.map(r => ({itemClassName: r.itemClassName, ratePerMinute: r.ratePerMinute, mode: r.mode})),
+						requests: plan.requests.map(r => ({itemClassName: r.itemClassName, ratePerMinute: r.ratePerMinute,
+							mode: r.mode, satisfactoryOverride: r.satisfactoryOverride})),
 						inputs: plan.inputs,
 						recipes: plan.settings.enabledRecipes ?? [defaults.alternateRecipes, defaults.conversionRecipes],
 						machines: plan.settings.disabledMachines,

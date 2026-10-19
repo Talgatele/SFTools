@@ -54,7 +54,8 @@ export class CalculatorQuickStartComponent
 		}
 		const plan = this.planManager.createPlan('', null);
 		this.planManager.setActivePlan(plan.id);
-		this.planManager.setRequests(plan.id, [{itemClassName, ratePerMinute: CalculatorQuickStartComponent.DEFAULT_RATE}]);
+		this.planManager.setRequests(plan.id, [{itemClassName, ratePerMinute: CalculatorQuickStartComponent.DEFAULT_RATE,
+			mode: itemClassName === SpecialClasses.PowerTarget || itemClassName === SpecialClasses.SinkPointsTarget ? undefined : 'satisfactory'}]);
 		// The auto-recalc watcher ignores plan switches, and this plan got its first item in the same tick it was opened.
 		if (this.planManager.activeSettings()?.calculationMode === 'automatic') {
 			this.actions.requestCalculate();

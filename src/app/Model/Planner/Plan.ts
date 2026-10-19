@@ -22,7 +22,7 @@ export interface Plan
 	/** null = no icon; undefined only on plans saved before labels were stored. */
 	readonly iconClassName?: string | null;
 
-	/** Name and icon follow the first product until the user sets their own; undefined on plans saved before the flags existed. */
+	/** Name follows the first product; icon follows the highest-tier output. Undefined on legacy plans. */
 	readonly autoName?: boolean;
 	readonly autoIcon?: boolean;
 

@@ -3,12 +3,13 @@ import {HelpApiService} from '@src/Model/API/HelpApiService';
 import {HelpArticleSummary} from '@src/Model/API/Schema/Help/HelpArticleSummary';
 import {HelpManifest} from '@src/Model/API/Schema/Help/HelpManifest';
 import {HelpManifestCategory} from '@src/Model/API/Schema/Help/HelpManifestCategory';
+import {withBundledHelp} from '@src/Model/Help/BundledHelp';
 
 @Injectable({providedIn: 'root'})
 export class HelpManager
 {
 
-	private readonly manifestSignal = signal<HelpManifest | null>(null);
+	private readonly manifestSignal = signal<HelpManifest | null>(withBundledHelp(null));
 	public readonly manifest = this.manifestSignal.asReadonly();
 
 	/** False until the first load settles, so nothing flashes "no help" meanwhile. */
@@ -33,6 +34,9 @@ export class HelpManager
 
 	public articleUrl(slug: string): string | undefined
 	{
+		if (slug === 'tab-request') {
+			return '/assets/help/tab-request.json';
+		}
 		const manifest = this.manifestSignal();
 		if (manifest === null || !(slug in manifest.articles)) {
 			return undefined;
@@ -43,7 +47,7 @@ export class HelpManager
 	public load(): void
 	{
 		this.api.loadManifest().subscribe(manifest => {
-			this.manifestSignal.set(manifest);
+			this.manifestSignal.set(withBundledHelp(manifest));
 			this.loadedSignal.set(true);
 		});
 	}

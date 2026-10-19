@@ -3,13 +3,13 @@
 		<thead>
 			<tr>
 				<th>Item</th>
-				<th style="width: 300px;">Rate</th>
+				<th style="width: 300px;">Rate <help-button topic="request.production"/></th>
 				<th style="width: 36px;"></th>
 			</tr>
 		</thead>
 		<tbody>
 			@for (row of rows; track $index; let i = $index) {
-				<tr>
+				<tr [class.custom-rate-row]="row.satisfactoryOverride !== undefined">
 					<td class="stack-full">
 						<item-picker
 							[options]="itemOptions"
@@ -42,6 +42,21 @@
 										step="any"
 									>
 								}
+							} @else if (modeOf(row) === 'satisfactory' && row.itemClassName !== powerTargetClass && row.itemClassName !== sinkPointsTargetClass) {
+								<input
+									type="number"
+									class="form-control form-control-sm bg-dark text-light"
+									[class.border-warning]="row.satisfactoryOverride !== undefined"
+									[class.border-secondary]="row.satisfactoryOverride === undefined"
+									[name]="'satisfactory-rate-' + i"
+									[attr.aria-label]="'Satisfactory rate in ' + rateUnit(row.itemClassName)"
+									[ngModel]="satisfactoryRateOf(row)"
+									(ngModelChange)="setSatisfactoryRate(row, $event)"
+									[ngModelOptions]="{updateOn: 'blur'}"
+									placeholder="Auto"
+									min="0"
+									step="any"
+								>
 							} @else {
 								<span
 									class="input-group-text bg-dark text-secondary border-secondary flex-grow-1"
@@ -76,6 +91,12 @@
 								</select>
 							}
 						</div>
+						@if (modeOf(row) === 'satisfactory' && row.satisfactoryOverride !== undefined) {
+							<div class="small text-warning mt-1">
+								Custom · {{ rateUnit(row.itemClassName) }}
+								<button type="button" class="btn btn-link btn-sm p-0 ms-2" (click)="resetSatisfactoryRate(row)">Reset to auto</button>
+							</div>
+						}
 					</td>
 					<td>
 						<button
@@ -88,12 +109,6 @@
 			}
 		</tbody>
 	</table>
-
-	@if (hasSatisfactoryMode) {
-		<info-note class="mb-2">
-			Satisfactory mode maximises production, then rebuilds the plan at a nearby whole rate when possible, otherwise a half or one-decimal rate. Outputs below 0.1/min keep their exact maximum.
-		</info-note>
-	}
 
 	<button class="btn btn-sm btn-outline-success w-100" type="button" (click)="addRow()">
 		+ Add Item

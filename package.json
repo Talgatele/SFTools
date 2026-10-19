@@ -6,7 +6,8 @@
 		"start": "ng serve",
 		"build": "ng build",
 		"watch": "ng build --watch --configuration development",
-		"test": "ng test"
+		"test": "ng test",
+		"test:satisfactory": "node --import ./tests/register-typescript.mjs --test tests/satisfactory-mode.test.mjs"
 	},
 	"private": true,
 	"license": "MIT",
