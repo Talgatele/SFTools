@@ -36,7 +36,9 @@ export class SaveFileService
 			});
 
 			file.arrayBuffer().then(
-				buffer => worker.postMessage({fileName: file.name, buffer} satisfies SaveFileWorkerRequest, [buffer]),
+				buffer => {
+					if (!subscriber.closed) worker.postMessage({fileName: file.name, buffer} satisfies SaveFileWorkerRequest, [buffer]);
+				},
 				() => subscriber.error(new Error('The selected file could not be read.')),
 			);
 

@@ -3,7 +3,6 @@ import {faCircleCheck, faLock, faTriangleExclamation, IconDefinition} from '@for
 import {Cell, Edge as X6Edge, EdgeToolNativeItem, EdgeView, Export, Graph as X6Graph, Node as X6Node, Selection} from '@antv/x6';
 import type {Metadata as PortsMetadata, PortMetadata} from '@antv/x6/lib/model/port';
 import type {Handle as VertexHandle} from '@antv/x6/lib/registry/tool/vertices';
-import ELK from 'elkjs/lib/elk.bundled.js';
 import type {ElkExtendedEdge, ElkNode} from 'elkjs';
 import {GraphPoint} from '@src/Model/Planner/Graph/GraphPoint';
 import {Observable, Subject, Subscription} from 'rxjs';
@@ -550,6 +549,7 @@ export class PlannerGraphService implements OnDestroy
 			edges: elkEdges,
 		};
 
+		const {default: ELK} = await import('elkjs/lib/elk.bundled.js');
 		const elk = new ELK();
 		const laid = await elk.layout(elkGraph);
 

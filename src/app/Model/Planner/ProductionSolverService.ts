@@ -671,6 +671,8 @@ export class ProductionSolverService
 
 		const byproducts: string[] = [];
 		const disabledByproducts = new Set(request.disabledByproducts);
+		const productionItems = new Set(request.productions.map(production => production.item));
+		const maximisedItems = new Set(request.maximise?.items.map(item => item.className));
 
 		items.forEach((usage, itemClass) => {
 			lines.push('\\\\ ' + itemClass);
@@ -681,12 +683,12 @@ export class ProductionSolverService
 			}
 
 			const item = data.getItemByClassName(itemClass);
-			if (item && request.productions.some(production => production.item === item)) {
+			if (item && productionItems.has(item)) {
 				lines.push('- 1 ' + itemClass + '@Product');
 			}
 
 			// Separate from @Product so an item can be fixed-rate and maximised at the same time.
-			if (request.maximise?.items.some(maximised => maximised.className === itemClass)) {
+			if (maximisedItems.has(itemClass)) {
 				lines.push('- 1 ' + itemClass + '@Maximise');
 			}
 
@@ -812,17 +814,18 @@ export class ProductionSolverService
 
 	private nodesFromColumns(columns: Map<string, number>, data: Data, groupingMode: GroupingMode): Node[]
 	{
-		const kept = [...columns.entries()]
-			.map(([Name, Primal]) => ({Name, Primal}))
-			.filter(column => Math.abs(column.Primal) > 1e-6)
-			.filter(column => !column.Name.endsWith('_count'))
+		const kept: {Name: string; Primal: number}[] = [];
+		for (const [Name, Primal] of columns) {
+			if (!(Math.abs(Primal) > 1e-6) || Name.endsWith('_count')
 			// Locked nodes pass through from the existing graph, never rebuilt.
-			.filter(column => !column.Name.startsWith('locked_'))
+				|| Name.startsWith('locked_')
 			// Surpluses and the maximise loop's bookkeeping are not graph nodes (@Carry is netted into @Byproduct before parsing).
-			.filter(column => column.Name !== 'PowerSurplus' && column.Name !== 'SinkPointsSurplus' && column.Name !== 'MaxRate')
-			.filter(column => !column.Name.endsWith('@Carry'))
+				|| Name === 'PowerSurplus' || Name === 'SinkPointsSurplus' || Name === 'MaxRate'
+				|| Name.endsWith('@Carry')
 			// Byproduct slack picks up feasibility-tolerance noise that would render as "0.00/min" nodes.
-			.filter(column => !(column.Name.endsWith('@Byproduct') && Math.abs(column.Primal) < 0.0005));
+				|| (Name.endsWith('@Byproduct') && Math.abs(Primal) < 0.0005)) continue;
+			kept.push({Name, Primal});
+		}
 
 		return kept
 			.map(column => {

@@ -108,9 +108,15 @@ export class GraphComposer
 
 	private withPriorRouting(edges: GraphEdge[], priorEdges: GraphEdge[]): GraphEdge[]
 	{
+		const key = (edge: GraphEdge) => JSON.stringify([edge.sourceId, edge.targetId, edge.itemClassName]);
+		const priorByConnection = new Map<string, GraphEdge>();
+		for (const prior of priorEdges) {
+			const connection = key(prior);
+			// Keep the first match, including when imported data has duplicate connections.
+			if (!priorByConnection.has(connection)) priorByConnection.set(connection, prior);
+		}
 		return edges.map(edge => {
-			const prior = priorEdges.find(e =>
-				e.sourceId === edge.sourceId && e.targetId === edge.targetId && e.itemClassName === edge.itemClassName);
+			const prior = priorByConnection.get(key(edge));
 			return prior
 				? {...edge, vertices: prior.vertices, labelDistance: prior.labelDistance}
 				: edge;

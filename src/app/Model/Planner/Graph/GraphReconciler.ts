@@ -49,6 +49,17 @@ export class GraphReconciler
 	public computeWarnings(graph: Graph): Map<string, GraphNodeWarnings>
 	{
 		const warnings = new Map<string, GraphNodeWarnings>();
+		const suppliedByNode = new Map<string, Map<string, number>>();
+		const consumedByNode = new Map<string, Map<string, number>>();
+		const add = (index: Map<string, Map<string, number>>, id: string, item: string, amount: number) => {
+			let totals = index.get(id);
+			if (!totals) index.set(id, totals = new Map());
+			totals.set(item, (totals.get(item) ?? 0) + amount);
+		};
+		for (const edge of graph.edges) {
+			add(suppliedByNode, edge.targetId, edge.itemClassName, edge.amount);
+			add(consumedByNode, edge.sourceId, edge.itemClassName, edge.amount);
+		}
 
 		graph.nodes.forEach(node => {
 			const inputs: GraphNodeInputWarning[] = [];
@@ -57,8 +68,7 @@ export class GraphReconciler
 
 			if (this.hasFixedDemand(node)) {
 				this.requiredInputs(node).forEach((required, itemClassName) => {
-					const supplied = this.sumEdges(graph.edges, edge =>
-						edge.targetId === node.id && edge.itemClassName === itemClassName);
+					const supplied = suppliedByNode.get(node.id)?.get(itemClassName) ?? 0;
 					if (this.differs(required, supplied)) {
 						inputs.push({itemClassName, required, supplied});
 					}
@@ -66,8 +76,7 @@ export class GraphReconciler
 			}
 			if (this.hasFixedSupply(node)) {
 				this.producedOutputs(node).forEach((produced, itemClassName) => {
-					const consumed = this.sumEdges(graph.edges, edge =>
-						edge.sourceId === node.id && edge.itemClassName === itemClassName);
+					const consumed = consumedByNode.get(node.id)?.get(itemClassName) ?? 0;
 					if (this.differs(produced, consumed)) {
 						outputs.push({itemClassName, produced, consumed});
 					}
@@ -243,17 +252,23 @@ export class GraphReconciler
 	/** The edited node is exempt: its amount is the contract the user just set, even when unconnected. */
 	private recomputeElasticNodes(nodes: Node[], edges: GraphEdge[], editedNodeId: string): Node[]
 	{
+		const incoming = new Map<string, number>();
+		const outgoing = new Map<string, number>();
+		for (const edge of edges) {
+			incoming.set(edge.targetId, (incoming.get(edge.targetId) ?? 0) + edge.amount);
+			outgoing.set(edge.sourceId, (outgoing.get(edge.sourceId) ?? 0) + edge.amount);
+		}
 		return nodes
 			.map(node => {
 				if (node.id === editedNodeId) {
 					return node;
 				}
 				if (node instanceof ByproductNode) {
-					const total = this.sumEdges(edges, edge => edge.targetId === node.id);
+					const total = incoming.get(node.id) ?? 0;
 					return this.resized(node, total, item => new ByproductNode(node.id, total, item));
 				}
 				if (node instanceof InputNode) {
-					const total = this.sumEdges(edges, edge => edge.sourceId === node.id);
+					const total = outgoing.get(node.id) ?? 0;
 					return this.resized(node, total, item => new InputNode(node.id, total, item));
 				}
 				return node;
@@ -307,7 +322,11 @@ export class GraphReconciler
 
 	private sumEdges(edges: GraphEdge[], match: (edge: GraphEdge) => boolean): number
 	{
-		return edges.filter(match).reduce((sum, edge) => sum + edge.amount, 0);
+		let total = 0;
+		for (const edge of edges) {
+			if (match(edge)) total += edge.amount;
+		}
+		return total;
 	}
 
 	private differs(a: number, b: number): boolean

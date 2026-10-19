@@ -1,4 +1,4 @@
-import {Component, ChangeDetectionStrategy} from '@angular/core';
+import {Component, ChangeDetectionStrategy, computed} from '@angular/core';
 import {FormsModule} from '@angular/forms';
 import {FaIconComponent} from '@fortawesome/angular-fontawesome';
 import {faChevronRight, faRecycle} from '@fortawesome/free-solid-svg-icons';
@@ -41,6 +41,16 @@ export class CalculatorRecipesTabComponent
 
 	public filter = '';
 	public readonly foldState: CollapsibleSections;
+	private readonly sortedMachineRecipes = computed(() => {
+		const data = this.data();
+		return data ? data.getRecipesForMachines()
+			.sort((a, b) => this.displayName(a).localeCompare(this.displayName(b))) : [];
+	});
+	private readonly enabledRecipes = computed(() => {
+		const settings = this.planManager.activeSettings();
+		const data = this.data();
+		return settings && data ? this.resolver.resolve(settings, data) : null;
+	});
 
 	public constructor(
 		private readonly planManager: PlanManager,
@@ -114,27 +124,25 @@ export class CalculatorRecipesTabComponent
 
 	public toggle(recipe: Recipe): void
 	{
-		const enabled = this.enabledSet();
-		if (!enabled) return;
+		const current = this.enabledSet();
+		if (!current) return;
+		const enabled = new Set(current);
 		enabled.has(recipe.className) ? enabled.delete(recipe.className) : enabled.add(recipe.className);
 		this.persist(enabled);
 	}
 
 	public setAll(recipes: Recipe[], value: boolean): void
 	{
-		const enabled = this.enabledSet();
-		if (!enabled) return;
+		const current = this.enabledSet();
+		if (!current) return;
+		const enabled = new Set(current);
 		recipes.forEach(recipe => value ? enabled.add(recipe.className) : enabled.delete(recipe.className));
 		this.persist(enabled);
 	}
 
 	private machineRecipes(): Recipe[]
 	{
-		const data = this.data();
-		if (!data) return [];
-		return data.getRecipesForMachines()
-			.slice()
-			.sort((a, b) => this.displayName(a).localeCompare(this.displayName(b)));
+		return this.sortedMachineRecipes();
 	}
 
 	private filterAndRank(recipes: Recipe[]): Recipe[]
@@ -152,10 +160,7 @@ export class CalculatorRecipesTabComponent
 
 	private enabledSet(): Set<string> | null
 	{
-		const settings = this.planManager.activeSettings();
-		const data = this.data();
-		if (!settings || !data) return null;
-		return this.resolver.resolve(settings, data);
+		return this.enabledRecipes();
 	}
 
 	private persist(enabled: Set<string>): void

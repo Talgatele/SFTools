@@ -22,31 +22,44 @@ export class GraphEdgeBuilder
 
 		const outputsByItem = new Map<string, IndexedIO[]>();
 		const inputsByItem = new Map<string, IndexedIO[]>();
+		// Only needed when preserving connections. Key by node, then item, to avoid scanning
+		// every producer/consumer of an item for every prior edge (and allocating filtered arrays).
+		const outputsByNode = new Map<string, Map<string, NodeIO[]>>();
+		const inputsByNode = new Map<string, Map<string, NodeIO[]>>();
+		const indexNodeIO = (index: Map<string, Map<string, NodeIO[]>>, nodeId: string, io: NodeIO) => {
+			let items = index.get(nodeId);
+			if (!items) index.set(nodeId, items = new Map());
+			const ios = items.get(io.item.className);
+			if (ios) ios.push(io);
+			else items.set(io.item.className, [io]);
+		};
 
 		nodes.forEach(node => {
 			node.outputs.forEach(io => {
 				const key = io.item.className;
 				if (!outputsByItem.has(key)) outputsByItem.set(key, []);
 				outputsByItem.get(key)!.push({nodeId: node.id, io});
+				if (priorEdges.length > 0) indexNodeIO(outputsByNode, node.id, io);
 			});
 			node.inputs.forEach(io => {
 				const key = io.item.className;
 				if (!inputsByItem.has(key)) inputsByItem.set(key, []);
 				inputsByItem.get(key)!.push({nodeId: node.id, io});
+				if (priorEdges.length > 0) indexNodeIO(inputsByNode, node.id, io);
 			});
 		});
 
 		const edges: GraphEdge[] = [];
 
 		priorEdges.forEach(prior => {
-			const outputs = (outputsByItem.get(prior.itemClassName) ?? []).filter(o => o.nodeId === prior.sourceId);
-			const inputs = (inputsByItem.get(prior.itemClassName) ?? []).filter(i => i.nodeId === prior.targetId);
+			const outputs = outputsByNode.get(prior.sourceId)?.get(prior.itemClassName) ?? [];
+			const inputs = inputsByNode.get(prior.targetId)?.get(prior.itemClassName) ?? [];
 			let amount = 0;
 			outputs.forEach(out => {
 				inputs.forEach(inp => {
-					const take = Math.min(out.io.remaining, inp.io.remaining);
-					out.io.remaining -= take;
-					inp.io.remaining -= take;
+					const take = Math.min(out.remaining, inp.remaining);
+					out.remaining -= take;
+					inp.remaining -= take;
 					amount += take;
 				});
 			});

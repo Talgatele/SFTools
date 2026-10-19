@@ -7,7 +7,9 @@
 		"build": "ng build",
 		"watch": "ng build --watch --configuration development",
 		"test": "ng test",
-		"test:satisfactory": "node --import ./tests/register-typescript.mjs --test tests/satisfactory-mode.test.mjs"
+		"test:satisfactory": "node --import ./tests/register-typescript.mjs --test tests/satisfactory-mode.test.mjs",
+		"test:performance": "node --import ./tests/register-typescript.mjs --test tests/performance-regressions.test.mjs",
+		"benchmark:performance": "node --expose-gc --import ./tests/register-typescript.mjs tests/performance-benchmark.mjs"
 	},
 	"private": true,
 	"license": "MIT",

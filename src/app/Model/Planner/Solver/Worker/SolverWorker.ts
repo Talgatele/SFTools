@@ -7,7 +7,8 @@ type HighsInstance = {solve: (problem: string, opts?: object) => HighsSolution};
 type HighsFactory = (opts: {locateFile: (file: string) => string}) => Promise<HighsInstance>;
 type SolutionWithRaw = {Columns?: Record<string, {Primal?: number}>; raw?: string};
 
-let highs: HighsInstance | null = null;
+// Share initialization when requests arrive while the WASM module is still loading.
+let highs: Promise<HighsInstance> | null = null;
 
 // highs.js is CJS and cannot be imported directly: fetched as text, given an ESM export and import()ed via a Blob URL,
 // which bypasses Vite's @fs/ resolution in dev and avoids importScripts(), which module workers lack.
@@ -39,7 +40,9 @@ function patchSolutionPrecision(source: string): string
     }
     return source
         .replace(anchorRead,
-            'Module["cwrap"]("Highs_writeSolution","number",["number","string"])(highs,"raw_"+SOLUTION_FILENAME);'
+            // The engine has read the model; release its MEMFS copy before extracting solutions.
+            'FS.unlink(MODEL_FILENAME);'
+            + 'Module["cwrap"]("Highs_writeSolution","number",["number","string"])(highs,"raw_"+SOLUTION_FILENAME);'
             + 'const rawSolution=FS.readFile("raw_"+SOLUTION_FILENAME,{encoding:"utf8"});'
             + 'FS.unlink("raw_"+SOLUTION_FILENAME);'
             + anchorRead)
@@ -54,19 +57,22 @@ function restoreFullPrecisionPrimals(solution: SolutionWithRaw): void
         return;
     }
 
-    const lines = raw.split(/\r?\n/);
-    const primalStart = lines.findIndex(line => line.startsWith('# Primal solution values'));
+    const primalStart = raw.indexOf('# Primal solution values');
     if (primalStart === -1) {
         return;
     }
-    const header = lines.findIndex((line, index) => index > primalStart && line.startsWith('# Columns'));
+    const header = raw.indexOf('\n# Columns', primalStart);
     if (header === -1) {
         return;
     }
-
-    const count = parseInt(lines[header].slice('# Columns'.length), 10);
-    for (let i = header + 1; i <= header + count && i < lines.length; i++) {
-        const parts = lines[i].split(/\s+/);
+    let start = raw.indexOf('\n', header + 1);
+    if (start === -1) return;
+    const count = parseInt(raw.slice(header + '\n# Columns'.length, start), 10);
+    // Read only the primal columns, without splitting the (potentially large) row/dual sections.
+    for (let i = 0; i < count && start < raw.length; i++) {
+        const end = raw.indexOf('\n', start + 1);
+        const parts = raw.slice(start + 1, end === -1 ? raw.length : end).replace(/\r$/, '').split(/\s+/);
+        start = end === -1 ? raw.length : end;
         if (parts.length !== 2) {
             continue;
         }
@@ -82,9 +88,13 @@ addEventListener('message', async ({data}: MessageEvent<SolverWorkerRequest>) =>
     const {id, problem, options} = data;
     try {
         if (highs === null) {
-            highs = await loadHighs();
+            highs = loadHighs().catch(error => {
+                highs = null;
+                throw error;
+            });
         }
-        const solution = highs.solve(problem, {
+        const solver = await highs;
+        const solution = solver.solve(problem, {
             presolve: 'on',
             mip_heuristic_effort: 0.3,
             mip_detect_symmetry: true,
@@ -94,6 +104,9 @@ addEventListener('message', async ({data}: MessageEvent<SolverWorkerRequest>) =>
             dual_feasibility_tolerance: 1e-9,
         });
         restoreFullPrecisionPrimals(solution as SolutionWithRaw);
+        // The UI uses status, objective and columns only. Avoid cloning row diagnostics across
+        // the worker boundary and retaining them through multi-stage maximisation solves.
+        solution.Rows = [];
         postMessage({id, solution, error: null} satisfies SolverWorkerResponse);
     } catch (e) {
         postMessage({id, solution: null, error: String(e)} satisfies SolverWorkerResponse);
