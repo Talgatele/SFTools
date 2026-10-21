@@ -28,6 +28,7 @@
 										[name]="'rate-' + i"
 										[ngModel]="powerRateOf(row)"
 										(ngModelChange)="setPowerRate(row, $event)"
+										(keydown.enter)="onRateEnter($event)"
 										min="0"
 										step="any"
 									>
@@ -38,6 +39,7 @@
 										[name]="'rate-' + i"
 										[(ngModel)]="row.ratePerMinute"
 										(ngModelChange)="sync()"
+										(keydown.enter)="onRateEnter($event)"
 										min="0"
 										step="any"
 									>
@@ -52,6 +54,7 @@
 									[attr.aria-label]="'Satisfactory rate in ' + rateUnit(row.itemClassName)"
 									[ngModel]="satisfactoryRateOf(row)"
 									(ngModelChange)="setSatisfactoryRate(row, $event)"
+									(keydown.enter)="onRateEnter($event)"
 									[ngModelOptions]="{updateOn: 'blur'}"
 									placeholder="Auto"
 									min="0"

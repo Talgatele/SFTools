@@ -8,6 +8,7 @@ import {InfoNoteComponent} from '@src/Components/Common/InfoNoteComponent';
 import {HelpButtonComponent} from '@src/Components/Help/HelpButtonComponent';
 import {ItemPickerComponent} from '@src/Components/Common/ItemPickerComponent';
 import {ItemPickerOption} from '@src/Components/Common/ItemPickerOption';
+import {PlannerActionsService} from '@src/Components/Planner/PlannerActionsService';
 import {Item} from '@src/Model/Data/Entities/Item';
 import {MakeableItemsResolver} from '@src/Model/Planner/MakeableItemsResolver';
 import {MaximiseCategory} from '@src/Model/Planner/Solver/Request/MaximiseCategory';
@@ -48,6 +49,7 @@ export class CalculatorProductionTabComponent implements OnDestroy
 		private readonly versionManager: VersionManager,
 		private readonly rateFormatter: RateFormatter,
 		private readonly makeableItems: MakeableItemsResolver,
+		private readonly actions: PlannerActionsService,
 	)
 	{
 		const initial = this.planManager.activePlan();
@@ -253,6 +255,17 @@ export class CalculatorProductionTabComponent implements OnDestroy
 			this.rows.push(this.blankRow());
 		}
 		this.sync();
+	}
+
+	public onRateEnter(event: Event): void
+	{
+		event.preventDefault();
+		event.stopPropagation();
+		// Satisfactory rates commit on blur; apply that edit before starting the solve.
+		(event.target as HTMLInputElement).blur();
+		if (!this.actions.isCalculating()) {
+			this.actions.requestCalculate();
+		}
 	}
 
 	public sync(): void
