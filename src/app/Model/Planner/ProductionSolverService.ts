@@ -16,7 +16,6 @@ import {GroupingMode} from '@src/Model/Planner/GroupingMode';
 import {HighsSolution} from '@src/Model/Planner/Solver/HighsSolution';
 import {MachineGroupNormalizer} from '@src/Model/Planner/MachineGroupNormalizer';
 import {Plan} from '@src/Model/Planner/Plan';
-import {ProductionResponse} from '@src/Model/Planner/ProductionResponse';
 import {SloopAccuracy} from '@src/Model/Planner/SloopAccuracy';
 import {SolverWorkerOptions} from '@src/Model/Planner/Solver/Worker/SolverWorkerOptions';
 import {SolverWorkerResponseType} from '@src/Model/Planner/Solver/Worker/SolverWorkerResponseType';

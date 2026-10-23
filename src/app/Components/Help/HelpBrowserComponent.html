@@ -47,9 +47,6 @@
 					<h1 class="h4 mb-1">Help</h1>
 					<p class="text-secondary small mb-0">Short guides to the planner, the codex and the rest of the site.</p>
 				</div>
-				@if (canEdit()) {
-					<a class="btn btn-sm btn-outline-secondary flex-shrink-0" routerLink="/help/editor">Edit help</a>
-				}
 			</div>
 
 			@if (!help.loaded()) {

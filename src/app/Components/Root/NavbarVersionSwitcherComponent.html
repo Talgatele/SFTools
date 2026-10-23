@@ -1,12 +1,12 @@
 <li class="nav-item dropdown" dropdown>
-	<a class="nav-link dropdown-toggle" dropdownToggle href="javascript: void(0);">
+	<button type="button" class="nav-link dropdown-toggle" dropdownToggle>
 		<fa-icon [icon]="faCodeBranch"></fa-icon>
 		@if (versionManager.activeVersion(); as version) {
 			{{ version.name }}
 		} @else {
 			Version
 		}
-	</a>
+	</button>
 	<ul *dropdownMenu class="dropdown-menu">
 		@for (version of versionManager.versions(); track version.id) {
 			<li>

@@ -31,7 +31,7 @@ export class PlannerInspectorComponent
 	public readonly readOnlyNote: Signal<string>;
 
 	public constructor(
-		private readonly plannerGraph: PlannerGraphService,
+		plannerGraph: PlannerGraphService,
 		planManager: PlanManager,
 	)
 	{

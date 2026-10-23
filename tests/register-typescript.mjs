@@ -9,6 +9,9 @@ registerHooks({
 		let url;
 		if (specifier.startsWith('@src/')) {
 			url = new URL('../src/app/' + specifier.slice(5) + '.ts', import.meta.url);
+		} else if (specifier.startsWith('@env/')) {
+			// Tests always use the committed environment, independent of a developer's local file.
+			url = new URL('../src/env/' + (specifier === '@env/env' ? 'env.prod' : specifier.slice(5)) + '.ts', import.meta.url);
 		} else if (specifier.startsWith('.') && context.parentURL?.endsWith('.ts')) {
 			url = new URL(specifier + '.ts', context.parentURL);
 		}

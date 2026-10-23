@@ -1,6 +1,6 @@
 import {Injectable, Signal, computed, signal} from '@angular/core';
 import {toObservable} from '@angular/core/rxjs-interop';
-import {Observable, Subject, distinctUntilChanged, filter, map, skip} from 'rxjs';
+import {Observable, Subject, distinctUntilChanged, map, skip} from 'rxjs';
 import {AuthService} from '@src/Model/Auth/AuthService';
 import {FoldersApiService} from '@src/Model/API/FoldersApiService';
 import {PlansApiService} from '@src/Model/API/PlansApiService';

@@ -3,8 +3,6 @@ import {Router} from '@angular/router';
 import {Observable, of} from 'rxjs';
 import {filter, map, switchMap, take, tap, timeout} from 'rxjs/operators';
 import {SharesApiService} from '@src/Model/API/SharesApiService';
-import {SharedFolderNode} from '@src/Model/API/Schema/Shares/SharedFolderNode';
-import {SharedPlanNode} from '@src/Model/API/Schema/Shares/SharedPlanNode';
 import {SharePayload} from '@src/Model/API/Schema/Shares/SharePayload';
 import {VersionManager} from '@src/Model/Data/VersionManager';
 import {NotificationService} from '@src/Model/NotificationService';

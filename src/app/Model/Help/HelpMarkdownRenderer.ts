@@ -9,6 +9,7 @@ import {
 	faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
 import {Marked, TextRenderer} from 'marked';
+import DOMPurify from 'dompurify';
 import {HelpApiService} from '@src/Model/API/HelpApiService';
 import {HelpArticleSection} from '@src/Model/API/Schema/Help/HelpArticleSection';
 import {HelpLinkResolver} from '@src/Model/Help/HelpLinkResolver';
@@ -48,7 +49,10 @@ export class HelpMarkdownRenderer
 	{
 		const html = this.marked(links).parse(markdown, {async: false});
 		// marked has no hook for the opening tag alone; rebuilding its table renderer for two classes would be far more code.
-		return html.replace(/<table>/g, '<table class="table table-sm table-dark mb-3">');
+		return DOMPurify.sanitize(html.replace(/<table>/g, '<table class="table table-sm table-dark mb-3">'), {
+			USE_PROFILES: {html: true, svg: true},
+			ADD_ATTR: ['target'],
+		});
 	}
 
 	public sections(markdown: string): HelpArticleSection[]
@@ -181,7 +185,7 @@ export class HelpMarkdownRenderer
 				+ `${tooltipAttribute(this.panelTooltip(links.panelLabel(panel[1])))}>${this.linkIcon('panel')}${text}</a>`;
 		}
 
-		if (href.startsWith('/')) {
+		if (href.startsWith('/') && !href.startsWith('//') && !href.includes('\\')) {
 			return `<a href="${this.escape(href)}" data-help-route="${this.escape(href)}"${tooltipAttribute('')}>${text}</a>`;
 		}
 
@@ -215,9 +219,14 @@ export class HelpMarkdownRenderer
 	private externalTooltip(href: string): string
 	{
 		const url = new URL(href, document.baseURI);
-		return url.protocol === 'mailto:'
-			? `Send an email to ${decodeURIComponent(url.pathname)}`
-			: `Open ${url.hostname} in a new tab`;
+		if (url.protocol !== 'mailto:') {
+			return `Open ${url.hostname} in a new tab`;
+		}
+		try {
+			return `Send an email to ${decodeURIComponent(url.pathname)}`;
+		} catch {
+			return 'Send an email';
+		}
 	}
 
 	private image(href: string, title: string | null, alt: string): string

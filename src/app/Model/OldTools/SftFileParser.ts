@@ -25,7 +25,7 @@ export class SftFileParser
 			throw new Error('The file is not a valid Satisfactory Tools export.');
 		}
 
-		if (parsed.type !== 'tabs' || !Array.isArray(parsed.tabs)) {
+		if (parsed === null || typeof parsed !== 'object' || parsed.type !== 'tabs' || !Array.isArray(parsed.tabs)) {
 			throw new Error('The file is not a production line export.');
 		}
 		return parsed.tabs.filter(tab => !!tab?.metadata && !!tab?.request);

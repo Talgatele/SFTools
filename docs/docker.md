@@ -33,7 +33,7 @@ If port 8080 is already in use, set `SFTOOLS_PORT` to another host port before s
 The standalone `docker-compose.prod.yml` follows the other home-server projects:
 
 ```text
-https://satisfactory.bitstacker.net -> Cloudflare -> cloudflared -> Caddy:80 -> sftools:80
+https://satisfactory.bitstacker.dev -> Cloudflare -> cloudflared -> Caddy:80 -> sftools:80
 ```
 
 Each app has its own Caddy and remotely managed tunnel. All three containers share
@@ -63,7 +63,7 @@ HTTPS; Caddy uses HTTP inside Docker and preserves the public Host header. See
 
    | Setting | Value |
    | --- | --- |
-   | Public hostname | `satisfactory.bitstacker.net` |
+   | Public hostname | `satisfactory.bitstacker.dev` |
    | Service type | HTTP |
    | Service URL | `http://caddy:80` (or `caddy:80` in the separate URL field) |
    | HTTP Host Header | Leave unset to preserve the public hostname |
@@ -84,14 +84,14 @@ HTTPS; Caddy uses HTTP inside Docker and preserves the public Host header. See
    would also publish the development port. The token is required for production
    commands and missing values fail immediately. Caddy waits for the app's health
    check; cloudflared waits for Caddy's proxy health check.
-6. Open `https://satisfactory.bitstacker.net`. Reload a deep link such as `/help`
+6. Open `https://satisfactory.bitstacker.dev`. Reload a deep link such as `/help`
    and confirm the planner loads game data. Check the HTML through the complete route:
 
    ```bash
-   curl -fsS https://satisfactory.bitstacker.net/help | grep 'og:url'
+   curl -fsS https://satisfactory.bitstacker.dev/help | grep 'og:url'
    ```
 
-   The URL should use `https://satisfactory.bitstacker.net/help`.
+   The URL should use `https://satisfactory.bitstacker.dev/help`.
 
 No router port forwarding or Caddy public certificate setup is required. The server
 must be able to make outbound tunnel connections to Cloudflare. If the tunnel is
@@ -99,7 +99,7 @@ healthy but the site returns 404, check that the hostname and any Host override 
 `Caddyfile`. For 502 errors, check `docker compose -f docker-compose.prod.yml logs
 --tail=100 sftools caddy cloudflared` and container health in `ps`.
 
-The production frontend URL and link-preview allowlist use `satisfactory.bitstacker.net`.
+The production frontend URL and link-preview allowlist use `satisfactory.bitstacker.dev`.
 The external game-data API remains `https://api.new.satisfactorytools.com`; this stack
 does not include that backend. Its versions endpoint returned `Access-Control-Allow-Origin: *`
 when checked with the new origin on 23 October 2026. Plans stored on another domain must be exported and imported on the new

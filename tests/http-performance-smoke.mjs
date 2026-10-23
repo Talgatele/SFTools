@@ -3,8 +3,9 @@ import {get} from 'node:http';
 import {gunzipSync} from 'node:zlib';
 
 const origin = process.argv[2] ?? 'http://127.0.0.1:18082';
+const host = process.argv[3];
 const read = (path, encoding = 'identity') => new Promise((resolve, reject) => {
-	get(new URL(path, origin), {headers: {'Accept-Encoding': encoding}}, response => {
+	get(new URL(path, origin), {headers: {'Accept-Encoding': encoding, ...(host ? {Host: host} : {})}}, response => {
 		const chunks = [];
 		response.on('data', chunk => chunks.push(chunk));
 		response.on('end', () => resolve({status: response.statusCode, headers: response.headers, body: Buffer.concat(chunks)}));

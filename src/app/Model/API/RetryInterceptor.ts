@@ -9,12 +9,12 @@ import {ConnectivityService} from '@src/Model/Network/ConnectivityService';
 /** Totals just over half a minute - how long a deployment takes to swap the API over. */
 const RETRY_DELAYS = [2000, 5000, 10000, 15000];
 
-/** The request never reached the application, so replaying it cannot duplicate anything - even a POST is safe. */
+/** A gateway error can arrive after an upstream write committed. Only safe methods may be replayed. */
 const GATEWAY_STATUSES = [502, 503, 504];
 
 const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
 
-/** Registered before AuthInterceptor, so each retry passes through the auth layer again and carries a freshly refreshed token. */
+/** Retry transient failures of reads without replaying writes. */
 @Injectable()
 export class RetryInterceptor implements HttpInterceptor
 {
@@ -55,13 +55,14 @@ export class RetryInterceptor implements HttpInterceptor
 		if (!(err instanceof HttpErrorResponse)) {
 			return false;
 		}
+		if (!SAFE_METHODS.includes(req.method.toUpperCase())) {
+			return false;
+		}
 		if (GATEWAY_STATUSES.includes(err.status)) {
 			return true;
 		}
 		// Status 0 never completed, so only replay safe methods while the browser reports a connection.
-		return err.status === 0
-			&& SAFE_METHODS.includes(req.method.toUpperCase())
-			&& this.connectivity.online();
+		return err.status === 0 && this.connectivity.online();
 	}
 
 }

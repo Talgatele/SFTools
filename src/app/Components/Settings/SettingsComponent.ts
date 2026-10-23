@@ -82,7 +82,7 @@ export class SettingsComponent implements OnDestroy
 
 	public constructor(
 		protected readonly settings: SettingsManager,
-		private readonly route: ActivatedRoute,
+		route: ActivatedRoute,
 		private readonly router: Router,
 	)
 	{

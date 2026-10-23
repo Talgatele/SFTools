@@ -4,8 +4,6 @@ import {HomeComponent} from '@src/Components/Home/HomeComponent';
 import {VersionContextComponent} from '@src/Components/Version/VersionContextComponent';
 import {CodexPageComponent} from '@src/Components/Codex/CodexPageComponent';
 import {HelpPageComponent} from '@src/Components/Help/HelpPageComponent';
-import {HelpArticleEditorComponent} from '@src/Components/HelpEditor/HelpArticleEditorComponent';
-import {HelpEditorComponent} from '@src/Components/HelpEditor/HelpEditorComponent';
 import {AboutComponent} from '@src/Components/About/AboutComponent';
 import {CreateVersionPageComponent} from '@src/Components/Versions/CreateVersionPageComponent';
 import {ModDetailComponent} from '@src/Components/Mods/ModDetailComponent';
@@ -14,7 +12,6 @@ import {ModListComponent} from '@src/Components/Mods/ModListComponent';
 import {PlannerComponent} from '@src/Components/Planner/PlannerComponent';
 import {SettingsComponent} from '@src/Components/Settings/SettingsComponent';
 import {ShareRedirectComponent} from '@src/Components/Shares/ShareRedirectComponent';
-import {HelpEditorGuard} from '@src/Model/Help/HelpEditorGuard';
 import {HomeRedirectGuard} from '@src/Model/Planner/HomeRedirectGuard';
 import {NotFoundComponent} from '@src/Components/Errors/NotFoundComponent';
 import {LegacyUrlRedirectComponent} from '@src/Components/Legacy/LegacyUrlRedirectComponent';
@@ -135,22 +132,8 @@ export class RouteList
 					data: {description: 'Write the items, recipes and buildings of a mod and get the data file to upload.'},
 					component: ModEditorComponent,
 				},
-				{
-					// Must precede the help matcher, which would otherwise read 'editor' as a slug.
-					path: 'help/editor',
-					title: 'Help editor',
-					canActivate: [HelpEditorGuard],
-					children: [
-						{
-							path: '',
-							component: HelpEditorComponent,
-						},
-						{
-							path: ':id',
-							component: HelpArticleEditorComponent,
-						},
-					],
-				},
+				// Accounts and remote help editing are disabled in this local-only build.
+				{path: 'help/editor', redirectTo: '/', pathMatch: 'prefix'},
 				{
 					// Must precede the ':versionSlug' catch-all.
 					matcher: RouteList.helpMatcher,

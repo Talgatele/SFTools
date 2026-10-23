@@ -1,4 +1,4 @@
-import {ApplicationConfig, ErrorHandler, isDevMode, importProvidersFrom, provideBrowserGlobalErrorListeners} from '@angular/core';
+import {ApplicationConfig, ErrorHandler, importProvidersFrom, provideBrowserGlobalErrorListeners} from '@angular/core';
 import {HTTP_INTERCEPTORS, provideHttpClient, withFetch, withInterceptorsFromDi} from '@angular/common/http';
 import {TitleStrategy, provideRouter, withComponentInputBinding, withInMemoryScrolling} from '@angular/router';
 import {AppPositioningService} from '@src/AppPositioningService';

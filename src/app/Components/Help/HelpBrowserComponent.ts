@@ -1,6 +1,5 @@
 import {Component, ChangeDetectionStrategy, ElementRef, computed, effect, signal} from '@angular/core';
 import {FormsModule} from '@angular/forms';
-import {RouterLink} from '@angular/router';
 import {FaIconComponent} from '@fortawesome/angular-fontawesome';
 import {faChevronDown, faChevronLeft, faChevronRight, faMagnifyingGlass} from '@fortawesome/free-solid-svg-icons';
 import {InfoNoteComponent} from '@src/Components/Common/InfoNoteComponent';
@@ -9,7 +8,6 @@ import {HelpArticleComponent} from '@src/Components/Help/HelpArticleComponent';
 import {HelpArticleGroup} from '@src/Components/Help/HelpArticleGroup';
 import {HelpLinkDirective} from '@src/Components/Help/HelpLinkDirective';
 import {HelpNavigation} from '@src/Components/Help/HelpNavigation';
-import {AccountProfileService} from '@src/Model/Auth/AccountProfileService';
 import {HelpManager} from '@src/Model/Help/HelpManager';
 
 @Component({
@@ -18,7 +16,6 @@ import {HelpManager} from '@src/Model/Help/HelpManager';
 	changeDetection: ChangeDetectionStrategy.Eager,
 	imports: [
 		FormsModule,
-		RouterLink,
 		FaIconComponent,
 		InfoNoteComponent,
 		HelpArticleCardComponent,
@@ -197,8 +194,6 @@ export class HelpBrowserComponent
 
 	public readonly slug = computed(() => this.navigation.slug());
 
-	public readonly canEdit = computed(() => this.profile.helpEditor());
-
 	public readonly groups = computed<HelpArticleGroup[]>(() => this.buildGroups(this.filter().trim().toLowerCase()));
 
 	public readonly navGroups = computed<HelpArticleGroup[]>(() => this.buildGroups(''));
@@ -218,7 +213,6 @@ export class HelpBrowserComponent
 
 	public constructor(
 		public readonly help: HelpManager,
-		private readonly profile: AccountProfileService,
 		private readonly navigation: HelpNavigation,
 		private readonly host: ElementRef<HTMLElement>,
 	)

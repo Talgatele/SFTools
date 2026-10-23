@@ -23,7 +23,7 @@ export class PlanFileReader
 			throw new Error('The file is damaged or not a Satisfactory Tools export.');
 		}
 
-		if (parsed.type !== 'sftools-plans' || !Array.isArray(parsed.roots) || typeof parsed.version?.id !== 'string') {
+		if (parsed === null || typeof parsed !== 'object' || parsed.type !== 'sftools-plans' || !Array.isArray(parsed.roots) || typeof parsed.version?.id !== 'string') {
 			throw new Error('The file is not a plans export.');
 		}
 		const roots = parsed.roots.filter(root => (root?.type === 'plan' || root?.type === 'folder') && typeof root.node?.id === 'string');

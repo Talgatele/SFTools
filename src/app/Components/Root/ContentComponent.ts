@@ -27,7 +27,7 @@ export class ContentComponent
 		public readonly notifications: NotificationService,
 		public readonly serverStatus: ServerStatusService,
 		// Injected for its side effect: the help index loads once here, so search and the question-mark buttons can read it synchronously.
-		help: HelpManager,
+		_help: HelpManager,
 	)
 	{
 	}

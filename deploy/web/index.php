@@ -11,12 +11,13 @@ final class PageHeadInjector
 	private const DEFAULT_API_URL = 'https://api.new.satisfactorytools.com';
 
 	/** Hosts og:url may name; anything else (an IP, a spoofed Host header) gets the first. */
-	private const PUBLIC_HOSTS = ['satisfactory.bitstacker.net', 'new.satisfactorytools.com', 'www.satisfactorytools.com', 'satisfactorytools.com'];
+	private const PUBLIC_HOSTS = ['satisfactory.bitstacker.dev', 'new.satisfactorytools.com', 'www.satisfactorytools.com', 'satisfactorytools.com'];
 
 	private const DEFAULT_IMAGE_PATH = '/assets/icons/android-chrome-512x512.png';
 	private const PATH_MAX_LENGTH = 512;
 	private const CONNECT_TIMEOUT_MS = 300;
 	private const TIMEOUT_MS = 800;
+	private const META_MAX_BYTES = 65536;
 
 	public function run(): void
 	{
@@ -47,21 +48,36 @@ final class PageHeadInjector
 
 		if (function_exists('curl_init')) {
 			$curl = curl_init($url);
+			$body = '';
 			curl_setopt_array($curl, [
-				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_FOLLOWLOCATION => false,
 				CURLOPT_CONNECTTIMEOUT_MS => self::CONNECT_TIMEOUT_MS,
 				CURLOPT_TIMEOUT_MS => self::TIMEOUT_MS,
 				CURLOPT_HTTPHEADER => ['Accept: application/json'],
+				CURLOPT_WRITEFUNCTION => static function ($handle, string $chunk) use (&$body): int {
+					if (strlen($body) + strlen($chunk) > self::META_MAX_BYTES) {
+						return 0;
+					}
+					$body .= $chunk;
+					return strlen($chunk);
+				},
 			]);
-			$body = curl_exec($curl);
+			$success = curl_exec($curl);
 			$status = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+			if ($success === false) {
+				return null;
+			}
 		} else {
-			$context = stream_context_create(['http' => ['timeout' => self::TIMEOUT_MS / 1000, 'ignore_errors' => true]]);
-			$body = @file_get_contents($url, false, $context);
+			$context = stream_context_create(['http' => [
+				'timeout' => self::TIMEOUT_MS / 1000,
+				'ignore_errors' => true,
+				'follow_location' => 0,
+			]]);
+			$body = @file_get_contents($url, false, $context, 0, self::META_MAX_BYTES + 1);
 			$status = isset($http_response_header[0]) && preg_match('~^HTTP/\S+\s+(\d+)~', $http_response_header[0], $match) === 1 ? (int) $match[1] : 0;
 		}
 
-		if ($status !== 200 || !is_string($body)) {
+		if ($status !== 200 || !is_string($body) || strlen($body) > self::META_MAX_BYTES) {
 			return null;
 		}
 		$meta = json_decode($body, true);

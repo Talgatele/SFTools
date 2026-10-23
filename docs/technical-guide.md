@@ -1,6 +1,6 @@
 # Satisfactory Tools: technical and agent guide
 
-Repository reference for humans and coding agents. Reviewed against the working tree on 19 October 2026. Paths below are relative to the repository root. The source and configuration take precedence when they change; dependency versions below are declared ranges, not a guarantee of the installed version.
+Repository reference for humans and coding agents. Reviewed against the working tree on 23 October 2026. Paths below are relative to the repository root. The source and configuration take precedence when they change; dependency versions below are declared ranges, not a guarantee of the installed version.
 
 ## 1. Project scope and boundaries
 
@@ -8,29 +8,29 @@ Satisfactory Tools is a browser application for planning factories in the game S
 
 This repository contains the Angular frontend and a small PHP web entry point for link-preview metadata. It does **not** contain the game-data/API backend, its database, or the game itself. References to `tools-api` in source comments describe an external service; no sibling backend checkout is required or established by this guide.
 
-The current build is local-only for accounts: `Model/Auth/AuthService.ts` always reports `isAuthenticated = false`, returns no refresh token, and rejects session changes. Plans and settings therefore use browser storage. Account API wrappers and sync abstractions remain in the codespace but do not imply working sign-in. `/auth` and `/account` redirect home, and the help editor's authentication guard prevents access. Public game data, mod data, custom-version operations, help, and shared links can still depend on the configured API. “Local-only” does not mean fully offline.
+The current build is local-only for accounts: `Model/Auth/AuthService.ts` always reports `isAuthenticated = false`. Plans and settings therefore use browser storage. Login/session code, profile APIs and the inaccessible help editor have been removed. Sync abstractions remain for shared planner services. `/auth`, `/account` and `/help/editor` redirect home. Public game data, mod data, custom-version operations, help, and shared links can still depend on the configured API. “Local-only” does not mean fully offline.
 
 ## 2. Technology and runtime
 
 | Area | Repository configuration |
 | --- | --- |
-| Framework | Angular `^22.0.2`, standalone components, Angular Router, dependency injection, signals/computed state, RxJS `^7.8.2` |
+| Framework | Angular `^22.2.3`, standalone components, Angular Router, dependency injection, signals/computed state, RxJS `^7.8.2` |
 | Language | TypeScript `~6.0.3`, strict mode, ES2022 target/module, bundler module resolution |
-| UI | Bootstrap `^5.3.8`, ngx-bootstrap `^21.2.1`, Font Awesome 7, Lato fonts, SCSS |
+| UI | Bootstrap `^5.3.8`, ngx-bootstrap `^22.0.0`, Font Awesome 7, Lato fonts, SCSS |
 | Interactive graph | AntV X6 `^3.1.7`; ELK `^0.11.1` layered layout is used by `PlannerGraphService` |
 | Optimisation | HiGHS `^1.14.2`, JavaScript/WASM in a module Web Worker; LP and mixed-integer options |
 | Save parsing | `@etothepii/satisfactory-file-parser` `^4.1.1`, in a separate module worker |
-| Markdown | `marked` `^18.0.13` |
+| Markdown | `marked` `^18.0.13`, DOMPurify `^3.4.17` |
 | Active build | `@angular/build:application` and `@angular/build:dev-server` in `angular.json` |
-| Reference Node runtime | Node 24 in CI and Docker; current Angular packages require at least 24.15.0 on this line |
+| Reference Node runtime | Node 24 in CI and Docker; security baseline 24.22.1 on this line |
 | Production web layer | PHP 8.3 + Apache in Docker; static Angular output plus metadata injection |
-| Package manager | npm, committed `package-lock.json`, `.npmrc` sets `legacy-peer-deps=true` |
+| Package manager | npm, committed `package-lock.json`, normal peer-dependency validation |
 
-The README also lists Node 20.19+/22.12+; those statements are not a verified compatibility matrix for the current dependency set. Prefer the CI/Docker Node 24 baseline and inspect dependency engine requirements if choosing another runtime.
+Prefer the CI/Docker Node 24 baseline (24.22.1 or newer on that line). Supported Node ranges are declared in `package.json` engines.
 
 Browser code depends on DOM/localStorage, Web Workers, WebAssembly, fetch, Blob URLs, and CompressionStream/DecompressionStream. This is a browser SPA, not Angular server-side rendering. PHP changes initial head tags but does not render Angular components.
 
-`extra-webpack.config.js`, `node-browser-stub.js`, custom-webpack dependencies, and `@antv/layout` exist, but the active builder does not reference the webpack configuration. Do not assume edits there affect the current build. `angular.json` is the source of truth; it externalises `node:fs` and `node:crypto` and copies HiGHS assets explicitly.
+`@angular/build` is a direct build dependency. The obsolete custom-webpack configuration, browser stubs, webpack toolchain and unused `@antv/layout` dependency have been removed. The Vite override selects a patched 8.3 release because Angular 22.2.4 pins a vulnerable version; review it when upgrading Angular. `angular.json` is the source of truth; it externalises `node:fs` and `node:crypto` and copies HiGHS assets explicitly.
 
 ## 3. Local setup and commands
 
@@ -44,7 +44,7 @@ if (!(Test-Path src/env/env.ts)) {
 npm start
 ```
 
-Open `http://localhost:4200/`. `env.ts` is gitignored; preserve an existing developer configuration. The committed example and production files both contain `production: true` and `apiUrl: https://api.new.satisfactorytools.com`. The example's `webUrl` points at `https://www.satisfactorytools.com`; production uses `https://satisfactory.bitstacker.net`. Set local values deliberately; copying the file does not turn the API into a local service.
+Open `http://localhost:4200/`. `env.ts` is gitignored; preserve an existing developer configuration. The committed example and production files both contain `production: true` and `apiUrl: https://api.new.satisfactorytools.com`. The example's `webUrl` points at `https://www.satisfactorytools.com`; production uses `https://satisfactory.bitstacker.dev`. Set local values deliberately; copying the file does not turn the API into a local service.
 
 | Command | Purpose |
 | --- | --- |
@@ -56,9 +56,9 @@ Open `http://localhost:4200/`. `env.ts` is gitignored; preserve an existing deve
 | `php -l deploy/web/index.php` | PHP syntax validation, also run by CI |
 | `docker compose up --build` | Build and serve on `http://localhost:8080/` |
 
-Production replaces `src/env/env.ts` with `src/env/env.prod.ts`, whose public web URL is `https://satisfactory.bitstacker.net`; the example environment retains the upstream URL. Frontend URLs are build-time values, not container runtime settings. `SFTOOLS_PORT` changes the local Compose host port. The standalone `docker-compose.prod.yml` runs the app behind its own Caddy and Cloudflare Tunnel without publishing ports; it requires `CLOUDFLARE_TUNNEL_TOKEN` in `.env`. See [Docker instructions](docker.md).
+Production replaces `src/env/env.ts` with `src/env/env.prod.ts`, whose public web URL is `https://satisfactory.bitstacker.dev`; the example environment retains the upstream URL. Frontend URLs are build-time values, not container runtime settings. `SFTOOLS_PORT` changes the local Compose host port. The standalone `docker-compose.prod.yml` runs the app behind its own Caddy and Cloudflare Tunnel without publishing ports; it requires `CLOUDFLARE_TUNNEL_TOKEN` in `.env`. See [Docker instructions](docker.md).
 
-**Validation gap:** `package.json` has `npm test` (`ng test`), but `angular.json` has no Angular test target. The focused `test:satisfactory` script uses Node's test runner and a TypeScript import hook independently of Angular's browser tooling. There is no npm lint script. The general automated baseline remains the Angular production build plus PHP syntax validation; the domain tests do not verify browser interaction or the full live game dataset.
+`npm test` runs domain, performance-regression and security tests using Node's test runner and the TypeScript import hook. `npm run test:security` selects security cases; `php tests/web-security.php` checks metadata with a local fixture. CI also runs `npm audit`, the Angular build, PHP syntax checks and Compose validation. There is no Angular test target or npm lint script; these tests do not replace browser interaction checks or verification against the full live game dataset.
 
 ## 4. Codespace map
 
@@ -92,7 +92,7 @@ All entries in this table are under `src/app/` unless otherwise stated.
 | `Components/Codex/`, `Model/Search/` | Game reference browsing/details and shared search behavior |
 | `Components/Mods/`, `Components/ModEditor/`, `Model/ModEditor/` | Mod browsing/editing, schema descriptors, validation and images |
 | `Components/Versions/`, `Model/Data/LocalCustomVersionsService.ts` | Custom version creation and local tracking |
-| `Components/Help/`, `Components/HelpEditor/`, `Model/Help/` | Help browsing/panels, content editing and permission guard |
+| `Components/Help/`, `Model/Help/` | Help browsing/panels and sanitized Markdown rendering |
 | `Model/Errors/`, `Model/Network/`, `Model/Meta/` | Error classification/redaction/reporting, connectivity and client page metadata |
 | `../styles/styles.scss`, `../styles/theme/` | Shared application styles and Bootstrap theme |
 | `../../deploy/web/index.php` | Initial HTML metadata from external `/v1/meta` |
@@ -114,7 +114,7 @@ All entries in this table are under `src/app/` unless otherwise stated.
 | Custom data | `/create-version`, `/mods`, `/mods/:modId`, `/mods/:modId/versions/:modVersionId/data`, `/mod-editor` |
 | Help | `/help` and `/help/:slug`; help also appears inside planner panels |
 | Settings/about | `/settings`, `/settings/:section`, `/about` |
-| Restricted/legacy routes | `/help/editor` and `/help/editor/:id` are guarded; legacy URLs and old `#!/...` links have dedicated conversion paths |
+| Restricted/legacy routes | `/help/editor` and its children redirect home; legacy URLs and old `#!/...` links have dedicated conversion paths |
 
 Custom matchers intentionally reuse planner/Codex/help components as internal paths change. Route changes therefore need to update state on navigation, not only at construction. Reserved top-level routes must precede `:versionSlug`. `main.ts` rewrites old hashbang links before routing.
 
@@ -163,7 +163,7 @@ This is not an exhaustive list of all UI storage keys. Use `AppStorage` rather t
 
 Plans include identity, folder/parent-plan references, settings, requests, inputs, optional graph, metadata and revision. Existing persisted plans may lack newer fields. Update normalization/defaults and serializers alongside type changes; a TypeScript interface alone does not migrate stored JSON. Relevant boundaries include `LocalPlanStoreBackend`, `PlanSettingsNormalizer`, `SettingsDefaults`, `PlanSerializer` and `PlanDataSerializer`.
 
-`.sft` uses comment lines followed by a format character and base64 of deflate-compressed JSON (`SftContainer`). Format `0` is legacy and `1` is this app's plan format. Use `PlanFileReader`/`Writer` and conversion services instead of treating files as plain JSON or copying graphs between versions without conversion.
+`.sft` uses comment lines followed by a format character and base64 of deflate-compressed JSON (`SftContainer`). Format `0` is legacy and `1` is this app's plan format. Containers are limited to 32 MiB of encoded text and 64 MiB of decompressed bytes; imports cancel the decompression stream at that limit. Export fewer plans at once if a file exceeds these limits. Use `PlanFileReader`/`Writer` and conversion services instead of treating files as plain JSON or copying graphs between versions without conversion.
 
 Save parsing is a different pipeline: `SaveFileService` transfers a file buffer to a worker, applies a 120-second timeout, and terminates the worker on completion/unsubscription. `SaveSettingsMapper` maps the result into planner settings.
 
@@ -171,13 +171,13 @@ Save parsing is a different pipeline: `SaveFileService` transfers a file buffer 
 
 HTTP wrappers in `Model/API/` and interfaces in `Model/API/Schema/` are the local reference for external API requests. Do not infer an enabled feature solely from an API method. For example, share create/read endpoints exist, but account-related behavior must be checked against the disabled `AuthService` and the calling UI. Backend contract changes require coordination outside this repository.
 
-Client metadata is managed by `Model/Meta/` and `RouteList.ts`. For unfurled links, `deploy/web/index.php` requests `/v1/meta?path=...`, injects escaped title/description/Open Graph tags, and falls back to generic HTML metadata on API failure. It limits the path, uses short timeouts and allowlists public hosts. Its metadata API can be configured using `SFTOOLS_API_URL`; `src/.htaccess` also sets that value. Changing the frontend `env.apiUrl` does not automatically change PHP's metadata API.
+Client metadata is managed by `Model/Meta/` and `RouteList.ts`. For unfurled links, `deploy/web/index.php` requests `/v1/meta?path=...`, injects escaped title/description/Open Graph tags, and falls back to generic HTML metadata on API failure. It limits the path and metadata response (64 KiB), disables redirects, uses short timeouts and allowlists public hosts. Its metadata API can be configured using `SFTOOLS_API_URL`; `src/.htaccess` also sets that value. Changing the frontend `env.apiUrl` does not automatically change PHP's metadata API.
 
 Route comments explicitly require titles/descriptions and reserved first segments to stay aligned with the external `tools-api` MetaResolver. Keep that coordination visible when changing routes or public metadata.
 
-The Angular build emits `dist/` including `.htaccess` and solver assets. PHP is **not** part of that build: CI and Docker copy `deploy/web/` into the output separately. `.htaccess` serves existing files, sends application routes to PHP when present, and otherwise falls back to `index.html`. The initial HTML is not cached; hashed JS/CSS receives long-lived caching. The beta `new.` host receives a noindex header. Root-based assets and deep-link fallback should be tested on a deployment change.
+The Angular build emits `dist/` including `.htaccess` and solver assets. PHP is **not** part of that build: Docker copies `deploy/web/` into the runtime web root separately. `.htaccess` serves existing files, sends application routes to PHP when present, and otherwise falls back to `index.html`. The initial HTML is not cached; hashed JS/CSS receives long-lived caching. The beta `new.` host receives a noindex header. Root-based assets and deep-link fallback should be tested on a deployment change.
 
-`.github/workflows/ci.yml` builds on Node 24 and syntax-checks PHP. Pushes to `master` additionally upload an artifact and deploy via SSH/rsync into timestamped releases, atomically switch the `current` symlink, and retain five releases. Deployment uses GitHub secrets (`DEPLOY_SSH_KEY`, `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PATH`). A subsequent link-preview check is allowed to fail. Do not interpret that check as a strict release gate or confuse local builds with deployment.
+`.github/workflows/ci.yml` runs the dependency audit, Node tests, production build, PHP security tests and Compose validation on Node 24. Its token has read-only contents permission and actions are pinned to commits. The obsolete upstream SSH deployment was removed; deploy this fork using the home-server Compose instructions. Dependabot checks npm packages, Docker base images and GitHub Actions weekly.
 
 ## 8. Efficient workflow for humans and agents
 
@@ -231,7 +231,7 @@ For executable changes, use `npm ci` and create the missing local env file befor
 | PHP/deployment | PHP syntax check, built deep-link fallback, metadata with API success/failure, JS/WASM asset delivery and cache behavior |
 | Documentation only | Verify referenced paths/configuration, local links and `git diff --check`; no application build is needed |
 
-Use isolated local data and explicit fixtures for browser checks. The configured production API is an external dependency: avoid changing remote records merely to validate a local UI change. If automated regression coverage is added, choose a runner and configure its Angular target explicitly rather than assuming the existing `npm test` script provides one.
+Use isolated local data and explicit fixtures for browser checks. The configured production API is an external dependency: avoid changing remote records merely to validate a local UI change. Node regression coverage is available through `npm test`; browser interaction tests still need an explicitly configured browser runner.
 
 ## 10. Ownership and maintenance
 

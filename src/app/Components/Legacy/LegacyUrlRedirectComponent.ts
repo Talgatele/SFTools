@@ -1,6 +1,6 @@
 import {Component, ChangeDetectionStrategy, Injector, OnDestroy} from '@angular/core';
 import {toObservable} from '@angular/core/rxjs-interop';
-import {ActivatedRoute, Params, Router, UrlSegment} from '@angular/router';
+import {ActivatedRoute, Params, Router} from '@angular/router';
 import {Subscription, of} from 'rxjs';
 import {filter, take, timeout} from 'rxjs/operators';
 import {Data} from '@src/Model/Data/Data';

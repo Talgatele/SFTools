@@ -1,4 +1,4 @@
-import {AfterViewInit, Component, computed, effect, ElementRef, HostListener, OnDestroy, signal, untracked, ViewChild, ChangeDetectionStrategy} from '@angular/core';
+import {AfterViewInit, Component, computed, effect, ElementRef, OnDestroy, signal, untracked, ViewChild, ChangeDetectionStrategy} from '@angular/core';
 import {toObservable} from '@angular/core/rxjs-interop';
 import {ActivatedRoute, Router} from '@angular/router';
 import {faBolt, faBook, faChartPie, faCircleQuestion, faCoins, faCrosshairs, faCubes, faFolderTree, faGear, faListCheck} from '@fortawesome/free-solid-svg-icons';
@@ -66,7 +66,6 @@ import {GraphComposer} from '@src/Model/Planner/Graph/GraphComposer';
 import {GraphEdge} from '@src/Model/Planner/Graph/GraphEdge';
 import {GraphLayoutResolver} from '@src/Model/Planner/GraphLayoutResolver';
 import {GroupingModeResolver} from '@src/Model/Planner/GroupingModeResolver';
-import {GraphMetrics} from '@src/Model/Planner/Graph/GraphMetrics';
 import {GraphPoint} from '@src/Model/Planner/Graph/GraphPoint';
 import {GraphSnapshot} from '@src/Model/Planner/Graph/GraphSnapshot';
 import {GraphEdgeBuilder} from '@src/Model/Planner/Graph/GraphEdgeBuilder';

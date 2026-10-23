@@ -16,7 +16,7 @@ const FILE_NAME = /\.(png|jpe?g|gif|webp|avif|svg)$/i;
 
 let tooltipCounter = 0;
 
-/** HelpMarkdownRenderer drops raw HTML and emits only known markup - hence the sanitizer bypass, without which Angular would strip the data attributes the click handler needs. */
+/** HelpMarkdownRenderer sanitizes its output with DOMPurify; Angular's additional pass would strip the SVG and data attributes used here. */
 @Component({
 	selector: 'help-content',
 	templateUrl: './HelpContentComponent.html',
