@@ -8,7 +8,7 @@ Satisfactory Tools is a browser application for planning factories in the game S
 
 This repository contains the Angular frontend and a small PHP web entry point for link-preview metadata. It does **not** contain the game-data/API backend, its database, or the game itself. References to `tools-api` in source comments describe an external service; no sibling backend checkout is required or established by this guide.
 
-The current build is local-only for accounts: `Model/Auth/AuthService.ts` always reports `isAuthenticated = false`. Plans and settings therefore use browser storage. Login/session code, profile APIs and the inaccessible help editor have been removed. Sync abstractions remain for shared planner services. `/auth`, `/account` and `/help/editor` redirect home. Public game data, mod data, custom-version operations, help, and shared links can still depend on the configured API. “Local-only” does not mean fully offline.
+The upstream account system remains disabled: `Model/Auth/AuthService.ts` reports `isAuthenticated = false`, and `/auth`, `/account` and `/help/editor` redirect home. The Docker installation has a separate password-protected shared plan library in `deploy/web/server-storage.php`. It stores plans, folders, graphs, per-plan settings and custom-version references in SQLite on the `sftools-data` volume. `SharedAppStorage` authenticates and hydrates that library before Angular starts; display preferences remain browser-local. The plain `npm start` server falls back explicitly to `BrowserAppStorage` on loopback. Public game data, mods and shared links still use the configured external API. See [shared library setup](shared-library.md).
 
 ## 2. Technology and runtime
 
@@ -23,7 +23,7 @@ The current build is local-only for accounts: `Model/Auth/AuthService.ts` always
 | Markdown | `marked` `^18.0.13`, DOMPurify `^3.4.17` |
 | Active build | `@angular/build:application` and `@angular/build:dev-server` in `angular.json` |
 | Reference Node runtime | Node 24 in CI and Docker; security baseline 24.22.1 on this line |
-| Production web layer | PHP 8.3 + Apache in Docker; static Angular output plus metadata injection |
+| Production web layer | PHP 8.3 + Apache in Docker; static Angular output, metadata injection and private SQLite library API |
 | Package manager | npm, committed `package-lock.json`, normal peer-dependency validation |
 
 Prefer the CI/Docker Node 24 baseline (24.22.1 or newer on that line). Supported Node ranges are declared in `package.json` engines.
@@ -56,9 +56,9 @@ Open `http://localhost:4200/`. `env.ts` is gitignored; preserve an existing deve
 | `php -l deploy/web/index.php` | PHP syntax validation, also run by CI |
 | `docker compose up --build` | Build and serve on `http://localhost:8080/` |
 
-Production replaces `src/env/env.ts` with `src/env/env.prod.ts`, whose public web URL is `https://satisfactory.bitstacker.dev`; the example environment retains the upstream URL. Frontend URLs are build-time values, not container runtime settings. `SFTOOLS_PORT` changes the local Compose host port. The standalone `docker-compose.prod.yml` runs the app behind its own Caddy and Cloudflare Tunnel without publishing ports; it requires `CLOUDFLARE_TUNNEL_TOKEN` in `.env`. See [Docker instructions](docker.md).
+Production replaces `src/env/env.ts` with `src/env/env.prod.ts`, whose public web URL is `https://satisfactory.bitstacker.dev`; the example environment retains the upstream URL. Frontend URLs are build-time values, not container runtime settings. `SFTOOLS_PORT` changes the local Compose host port. The standalone `docker-compose.prod.yml` runs the app behind its own Caddy and Cloudflare Tunnel without publishing ports; it requires `CLOUDFLARE_TUNNEL_TOKEN` and `SFTOOLS_PASSWORD` in `.env`. See [Docker instructions](docker.md).
 
-`npm test` runs domain, performance-regression and security tests using Node's test runner and the TypeScript import hook. `npm run test:security` selects security cases; `php tests/web-security.php` checks metadata with a local fixture. CI also runs `npm audit`, the Angular build, PHP syntax checks and Compose validation. There is no Angular test target or npm lint script; these tests do not replace browser interaction checks or verification against the full live game dataset.
+`npm test` runs domain, performance-regression and security tests using Node's test runner and the TypeScript import hook. `npm run test:security` selects security cases; `php tests/web-security.php` checks metadata with a local fixture; `php tests/shared-storage.php` checks authentication, revision conflicts and persistence. CI also runs `npm audit`, the Angular build, PHP syntax checks and Compose validation. There is no Angular test target or npm lint script; these tests do not replace browser interaction checks or verification against the full live game dataset.
 
 ## 4. Codespace map
 
@@ -96,6 +96,8 @@ All entries in this table are under `src/app/` unless otherwise stated.
 | `Model/Errors/`, `Model/Network/`, `Model/Meta/` | Error classification/redaction/reporting, connectivity and client page metadata |
 | `../styles/styles.scss`, `../styles/theme/` | Shared application styles and Bootstrap theme |
 | `../../deploy/web/index.php` | Initial HTML metadata from external `/v1/meta` |
+| `Model/Storage/SharedAppStorage.ts`, `LibrarySession.ts`, `LibraryImport.ts` | Pre-bootstrap library sign-in/load, browser migration, optimistic saves, durable draft journal and conflict recovery |
+| `../../deploy/web/server-storage.php` | Password/session/CSRF-protected SQLite library API; same-origin only |
 | `../.htaccess`, `../../docker/apache.conf` | SPA fallback, caching, metadata API setting and Apache behavior |
 
 ## 5. Features and routes
@@ -149,17 +151,18 @@ Solver implementation details that matter:
 
 ### Persistence and compatibility
 
-`PlanManager` extends `SyncableService<PlanStore>`. The local backend stores plans by **version ID**, while routes select versions by **slug**. It tracks when the store is loaded for the active version; a version change can reload and replace the store. Wait for the proper lifecycle before importing or mutating plans.
+`PlanManager` extends `SyncableService<PlanStore>`. `LocalPlanStoreBackend` uses the synchronous `AppStorage` abstraction by **version ID**, while routes select versions by **slug**. In Docker, `SharedAppStorage` supplies a preloaded server snapshot and queues revision-checked saves; in plain Angular development, `BrowserAppStorage` supplies browser storage. It tracks when the store is loaded for the active version; a version change can reload and replace the store. Wait for the proper lifecycle before importing or mutating plans.
 
-| Local storage key | Purpose |
+| Logical storage key | Purpose |
 | --- | --- |
 | `sftools.plans.<versionId>` | Per-version plans and folders |
 | `sftools.plans` | Legacy single store, migrated by `LocalPlanStoreBackend` |
 | `sftools.settings` | Settings, including graph/planner defaults, hotkeys and panels |
 | `sftools.lastPlanner` | Remembered planner location |
-| `sftools.customVersions` | Locally tracked custom-version IDs |
+| `sftools.customVersions` | Shared custom-version IDs |
+| `sftools.serverLibrary.journal` | Browser-local unsaved draft values and base revisions; never a password/session token |
 
-This is not an exhaustive list of all UI storage keys. Use `AppStorage` rather than adding direct browser-storage access to domain services. Storage is scoped to browser origin; changing host or port changes the visible local data. Use export files or a disposable browser profile when exercising destructive storage behavior.
+Plan keys and custom-version references are server-backed in Docker; UI keys remain per-browser. This is not an exhaustive list of UI storage keys. Use `AppStorage` rather than adding direct browser-storage access to domain services. Browser migration is scoped to the origin, while the authenticated server library is shared across devices. Use exports or a disposable library when exercising destructive storage behavior. Server saves use compare-and-swap revisions; stale edits remain drafts until explicitly recovered as a copy.
 
 Plans include identity, folder/parent-plan references, settings, requests, inputs, optional graph, metadata and revision. Existing persisted plans may lack newer fields. Update normalization/defaults and serializers alongside type changes; a TypeScript interface alone does not migrate stored JSON. Relevant boundaries include `LocalPlanStoreBackend`, `PlanSettingsNormalizer`, `SettingsDefaults`, `PlanSerializer` and `PlanDataSerializer`.
 

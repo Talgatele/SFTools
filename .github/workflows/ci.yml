@@ -29,9 +29,12 @@ jobs:
       - name: Check PHP and web security regressions
         run: |
           php -l deploy/web/index.php
+          php -l deploy/web/server-storage.php
           php tests/web-security.php
           php -d disable_functions=curl_init tests/web-security.php
+          php tests/shared-storage.php
       - name: Validate production Compose
         env:
           CLOUDFLARE_TUNNEL_TOKEN: configuration-validation-only
+          SFTOOLS_PASSWORD: configuration-validation-only
         run: docker compose -f docker-compose.prod.yml config --quiet

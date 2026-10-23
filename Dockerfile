@@ -21,6 +21,7 @@ RUN apt-get update \
 COPY docker/php.ini /usr/local/etc/php/conf.d/sftools.ini
 COPY docker/apache.conf /etc/apache2/conf-available/sftools.conf
 RUN a2enconf sftools
+RUN mkdir -p /var/lib/sftools && chown www-data:www-data /var/lib/sftools && chmod 700 /var/lib/sftools
 
 COPY --from=build /app/dist/ /var/www/html/
 COPY deploy/web/ /var/www/html/

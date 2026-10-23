@@ -6,6 +6,7 @@ dist
 node_modules
 out-tsc
 tmp
+backups
 npm-debug.log*
 .env
 .env.*

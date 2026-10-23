@@ -2,6 +2,14 @@
 
 ## Scope
 
+**Shared-library follow-up:** the installation now also contains a private SQLite plan
+library and independent password/session API. See [shared-library documentation](shared-library.md)
+for its authentication, storage, migration and deployment requirements. Its regression tests
+cover cross-device access, CSRF/origin enforcement, stale writes/deletes, session rotation,
+browser-draft recovery and server persistence. References below to browser-only plans
+describe the earlier review state, before this feature was added. Image scan results are
+the dated snapshots recorded in that review, not a scan of every later application build.
+
 Reviewed the application entry points and route graph, dependency lockfile,
 Markdown-to-DOM boundary, plan and save-file imports, local storage and share
 hydration, HTTP interceptors and error reporting, PHP metadata front controller,

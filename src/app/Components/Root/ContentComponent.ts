@@ -3,6 +3,7 @@ import {RouterOutlet} from '@angular/router';
 import {FaIconComponent} from '@fortawesome/angular-fontawesome';
 import {faXmark} from '@fortawesome/free-solid-svg-icons';
 import {NavbarComponent} from '@src/Components/Root/NavbarComponent';
+import {LibraryStatusComponent} from '@src/Components/Common/LibraryStatusComponent';
 import {SettingsConflictDialogComponent} from '@src/Components/Settings/SettingsConflictDialogComponent';
 import {ServerStatusService} from '@src/Model/API/ServerStatusService';
 import {HelpManager} from '@src/Model/Help/HelpManager';
@@ -15,6 +16,7 @@ import {NotificationService} from '@src/Model/NotificationService';
 		FaIconComponent,
 		RouterOutlet,
 		NavbarComponent,
+		LibraryStatusComponent,
 		SettingsConflictDialogComponent,
 	],
 })

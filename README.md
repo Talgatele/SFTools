@@ -50,6 +50,8 @@ The production build is emitted to the `dist/` folder. It uses `src/env/env.prod
 Build and run the production web app with Docker Compose:
 
 ```bash
+cp -n .env.example .env
+# Set SFTOOLS_PASSWORD in .env (at least 12 characters).
 docker compose up --build
 ```
 
@@ -58,6 +60,11 @@ Then visit `http://localhost:8080/`. See [docs/docker.md](docs/docker.md) for Do
 For the home server at `https://satisfactory.bitstacker.dev`, use the standalone
 `docker-compose.prod.yml` stack (app, Caddy, Cloudflare Tunnel). Follow the
 [home-server setup](docs/docker.md#home-server-caddy--cloudflare-tunnel) to configure the tunnel and start it.
+
+Plans and custom-version references are saved in a password-protected server library
+on a persistent Docker volume. Sign in with the same library password on each device.
+Existing browser plans are imported on first sign-in. See [shared plans and backups](docs/shared-library.md)
+for upgrading an existing installation, conflict recovery and backups. Display preferences stay per browser.
 
 ## Technical documentation
 

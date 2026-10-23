@@ -1,11 +1,11 @@
 # Docker
 
 The container builds the Angular frontend and serves the production bundle through Apache/PHP.
-The PHP layer supplies route-specific metadata for link previews; all other application routes
-fall back to the Angular app. The frontend uses the production API configured in
-`src/env/env.prod.ts`. This build has no sign-in, account sync, or analytics; plans and settings
-stay in the local browser storage. Public game data, mod listings, and shared links still use the
-configured API.
+The PHP layer supplies link-preview metadata and a private SQLite-backed plan library;
+application routes fall back to Angular. Plans and custom-version references persist on the
+`sftools-data` volume and are shared across devices after library-password sign-in. Display
+settings stay in each browser. Public game data, mod listings, and shared links still use the
+production API configured in `src/env/env.prod.ts`. See [shared library setup](shared-library.md).
 
 ## Prerequisites
 
@@ -17,6 +17,8 @@ configured API.
 From the repository root:
 
 ```bash
+cp -n .env.example .env
+# Set SFTOOLS_PASSWORD in .env (at least 12 characters).
 docker compose up --build
 ```
 
@@ -26,7 +28,8 @@ Open <http://localhost:8080/>. Stop the container with:
 docker compose down
 ```
 
-If port 8080 is already in use, set `SFTOOLS_PORT` to another host port before starting Compose.
+If port 8080 is already in use, set `SFTOOLS_PORT` to another host port and set
+`SFTOOLS_ORIGIN=http://localhost:YOUR_PORT` in `.env` before starting Compose.
 
 ## Home server: Caddy + Cloudflare Tunnel
 
@@ -48,7 +51,8 @@ HTTPS; Caddy uses HTTP inside Docker and preserves the public Host header. See
 2. In the [Cloudflare dashboard](https://developers.cloudflare.com/tunnel/get-started/),
    create a remotely managed Cloudflare Tunnel for this app (for example, `satisfactory`).
    Copy the tunnel token from its Docker installation instructions.
-3. Copy `.env.example` to `.env` and fill in `CLOUDFLARE_TUNNEL_TOKEN`:
+3. Copy `.env.example` to `.env` and fill in `CLOUDFLARE_TUNNEL_TOKEN` and
+   `SFTOOLS_PASSWORD` (a private password of at least 12 characters):
 
    ```bash
    cp .env.example .env
@@ -81,10 +85,12 @@ HTTPS; Caddy uses HTTP inside Docker and preserves the public Host header. See
    ```
 
    Use this production file **on its own**; combining it with the local Compose file
-   would also publish the development port. The token is required for production
+   would also publish the development port. The token and library password are required for production
    commands and missing values fail immediately. Caddy waits for the app's health
    check; cloudflared waits for Caddy's proxy health check.
-6. Open `https://satisfactory.bitstacker.dev`. Reload a deep link such as `/help`
+6. Open `https://satisfactory.bitstacker.dev` and sign in with the library password.
+   Wait for **Plans saved to server**; repeat on each device with existing browser plans
+   so they are imported. Reload a deep link such as `/help`
    and confirm the planner loads game data. Check the HTML through the complete route:
 
    ```bash
@@ -116,13 +122,15 @@ docker compose -f docker-compose.prod.yml up -d --build
 To refresh the Caddy and cloudflared images as well, run
 `docker compose -f docker-compose.prod.yml pull caddy cloudflared` before that command.
 To stop the stack, run `docker compose -f docker-compose.prod.yml down`.
-The application needs no server-side data volume; plans and settings live in users'
-browsers. Caddy's state has named volumes and the tunnel configuration lives in Cloudflare.
+The `sftools-data` volume holds the private SQLite library and sessions. Container rebuilds
+and normal `down`/`up` preserve it; `down --volumes` deletes it. Caddy's state has separate
+named volumes and the tunnel configuration lives in Cloudflare. See
+[upgrading and backing up the library](shared-library.md).
 
 ## Memory and concurrency
 
 Calculations and graph rendering run in the user's browser, including the HiGHS WebAssembly
-worker. The running container serves files and the PHP metadata front controller; it does not
+worker. The running container serves files, link-preview metadata and the SQLite library API; it does not
 run Node or the calculation engine.
 
 The image starts five Apache workers, retains five to ten spare workers, and allows up to 64
@@ -131,7 +139,7 @@ expire after two seconds. Requests beyond that concurrency wait for capacity. Ad
 `docker/apache.conf` for a busier deployment and rebuild the image.
 
 The existing PHP OPcache is limited to 16 MiB with a 1 MiB interned-string buffer, enough for
-the single front controller. These are cache budgets, not measurements of resident memory.
+the two PHP entry points. These are cache budgets, not measurements of resident memory.
 Timestamp checks are disabled because deployed PHP files change only with an image rebuild.
 If you mount edited PHP files into a development container, enable timestamp checks or restart
 the container after changes.
@@ -154,5 +162,6 @@ size production limits against your actual concurrent workload.
 
 ```bash
 docker build -t sftools:local .
-docker run --rm -p 8080:80 sftools:local
+# Export SFTOOLS_PASSWORD in your shell first (at least 12 characters).
+docker run --rm -e SFTOOLS_PASSWORD -e SFTOOLS_ORIGIN=http://localhost:8080 -v sftools-cli-data:/var/lib/sftools -p 8080:80 sftools:local
 ```
