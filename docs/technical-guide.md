@@ -44,7 +44,7 @@ if (!(Test-Path src/env/env.ts)) {
 npm start
 ```
 
-Open `http://localhost:4200/`. `env.ts` is gitignored; preserve an existing developer configuration. The committed example and production files both currently contain `production: true`, `webUrl: https://www.satisfactorytools.com`, and `apiUrl: https://api.new.satisfactorytools.com`. Set local values deliberately; copying the file does not turn the API into a local service.
+Open `http://localhost:4200/`. `env.ts` is gitignored; preserve an existing developer configuration. The committed example and production files both contain `production: true` and `apiUrl: https://api.new.satisfactorytools.com`. The example's `webUrl` points at `https://www.satisfactorytools.com`; production uses `https://satisfactory.bitstacker.net`. Set local values deliberately; copying the file does not turn the API into a local service.
 
 | Command | Purpose |
 | --- | --- |
@@ -56,7 +56,7 @@ Open `http://localhost:4200/`. `env.ts` is gitignored; preserve an existing deve
 | `php -l deploy/web/index.php` | PHP syntax validation, also run by CI |
 | `docker compose up --build` | Build and serve on `http://localhost:8080/` |
 
-Production replaces `src/env/env.ts` with `src/env/env.prod.ts`. Frontend URLs are build-time values, not container runtime settings. `SFTOOLS_PORT` changes the Compose host port. See [Docker instructions](docker.md).
+Production replaces `src/env/env.ts` with `src/env/env.prod.ts`, whose public web URL is `https://satisfactory.bitstacker.net`; the example environment retains the upstream URL. Frontend URLs are build-time values, not container runtime settings. `SFTOOLS_PORT` changes the local Compose host port. The standalone `docker-compose.prod.yml` runs the app behind its own Caddy and Cloudflare Tunnel without publishing ports; it requires `CLOUDFLARE_TUNNEL_TOKEN` in `.env`. See [Docker instructions](docker.md).
 
 **Validation gap:** `package.json` has `npm test` (`ng test`), but `angular.json` has no Angular test target. The focused `test:satisfactory` script uses Node's test runner and a TypeScript import hook independently of Angular's browser tooling. There is no npm lint script. The general automated baseline remains the Angular production build plus PHP syntax validation; the domain tests do not verify browser interaction or the full live game dataset.
 

@@ -114,6 +114,8 @@ const SUBPLAN_STATS_CHAR_WIDTH = 7.4;
 const SUBPLAN_MAX_WIDTH = 520;
 
 const ZOOMED_OUT_SCALE = 0.53;
+// Leave room above the simplification threshold so production numbers are readable on entry.
+const INITIAL_DETAIL_SCALE = 0.6;
 const ZOOMED_OUT_NODES_CLASS = 'pg-zoomed-out-nodes';
 const ZOOMED_OUT_EDGES_CLASS = 'pg-zoomed-out-edges';
 const ZOOMED_OUT_NAME_MAX_FONT = 24;
@@ -595,7 +597,7 @@ export class PlannerGraphService implements OnDestroy
 			x6Graph.zoom(previous.zoom, {absolute: true});
 			x6Graph.translate(previous.translate.tx, previous.translate.ty);
 		} else {
-			this.zoomToVisibleArea(x6Graph);
+			this.zoomToVisibleArea(x6Graph, true);
 		}
 		this.trackNodeMoves(x6Graph, graph.nodes);
 	}
@@ -759,15 +761,15 @@ export class PlannerGraphService implements OnDestroy
 		this.x6Graph?.zoom(-0.2);
 	}
 
-	public zoomFit(): void
+	public zoomFit(showProduction = false): void
 	{
 		if (this.x6Graph) {
-			this.zoomToVisibleArea(this.x6Graph);
+			this.zoomToVisibleArea(this.x6Graph, showProduction);
 		}
 	}
 
 	/** x6's zoomToFit centers on the full canvas, so the padding asymmetry is applied as a translation. */
-	private zoomToVisibleArea(x6Graph: X6Graph): void
+	private zoomToVisibleArea(x6Graph: X6Graph, showProduction = false): void
 	{
 		const insets = this.panelLayout.canvasInsets();
 		const padding = {
@@ -776,7 +778,10 @@ export class PlannerGraphService implements OnDestroy
 			top: insets.top + 40,
 			bottom: insets.bottom + 40,
 		};
-		x6Graph.zoomToFit({padding, maxScale: FIT_MAX_SCALE});
+		const minScale = showProduction
+			? INITIAL_DETAIL_SCALE / Math.min(this.nodeScale(), this.edgeScale())
+			: 0;
+		x6Graph.zoomToFit({padding, minScale, maxScale: Math.max(FIT_MAX_SCALE, minScale)});
 		x6Graph.translateBy((padding.left - padding.right) / 2, (padding.top - padding.bottom) / 2);
 	}
 

@@ -1,5 +1,8 @@
 # Local environment (CI creates it from env.prod.ts)
 /src/env/env.ts
+/.env
+/.env.*
+!/.env.example
 
 # Compiled output
 /dist

@@ -55,6 +55,10 @@ docker compose up --build
 
 Then visit `http://localhost:8080/`. See [docs/docker.md](docs/docker.md) for Docker CLI usage and deployment details.
 
+For the home server at `https://satisfactory.bitstacker.net`, use the standalone
+`docker-compose.prod.yml` stack (app, Caddy, Cloudflare Tunnel). Follow the
+[home-server setup](docs/docker.md#home-server-caddy--cloudflare-tunnel) to configure the tunnel and start it.
+
 ## Technical documentation
 
 See the [technical and agent guide](docs/technical-guide.md) for architecture, feature and source maps, data flows, persistence contracts, deployment, validation, and efficient workflows for humans and coding agents.

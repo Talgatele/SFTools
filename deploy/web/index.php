@@ -11,7 +11,7 @@ final class PageHeadInjector
 	private const DEFAULT_API_URL = 'https://api.new.satisfactorytools.com';
 
 	/** Hosts og:url may name; anything else (an IP, a spoofed Host header) gets the first. */
-	private const PUBLIC_HOSTS = ['new.satisfactorytools.com', 'www.satisfactorytools.com', 'satisfactorytools.com'];
+	private const PUBLIC_HOSTS = ['satisfactory.bitstacker.net', 'new.satisfactorytools.com', 'www.satisfactorytools.com', 'satisfactorytools.com'];
 
 	private const DEFAULT_IMAGE_PATH = '/assets/icons/android-chrome-512x512.png';
 	private const PATH_MAX_LENGTH = 512;

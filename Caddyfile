@@ -1,0 +1,10 @@
+# Cloudflare provides public HTTPS; cloudflared connects here over Docker's network.
+http://satisfactory.bitstacker.net {
+	reverse_proxy sftools:80 {
+		header_up X-Forwarded-Proto https
+	}
+}
+
+:80 {
+	respond 404
+}

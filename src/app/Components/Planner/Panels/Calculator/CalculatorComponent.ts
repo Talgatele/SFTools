@@ -350,7 +350,7 @@ export class CalculatorComponent implements OnDestroy
 			const active = this.graphTabActive();
 			this.panelLayout.setGraphView(active);
 			if (active) {
-				this.plannerGraph.zoomFit();
+				this.plannerGraph.zoomFit(true);
 			}
 		});
 		this.calculateHint = computed(() => this.graphDirty()

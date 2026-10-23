@@ -1,5 +1,5 @@
 export const env = {
 	production: true,
-	webUrl: 'https://www.satisfactorytools.com',
+	webUrl: 'https://satisfactory.bitstacker.net',
 	apiUrl: 'https://api.new.satisfactorytools.com',
 };
