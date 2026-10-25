@@ -16,6 +16,7 @@
 							[value]="row.itemClassName"
 							placeholder="- select item -"
 							(valueChange)="onItemChange(row, $event)"
+							(selectionConfirmed)="addRow()"
 						></item-picker>
 					</td>
 					<td class="stack-grow">

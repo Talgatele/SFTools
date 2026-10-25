@@ -52,7 +52,7 @@
 									<div class="progress-bar" [class.pool-plan]="!status.overUse" [class.bg-danger]="status.overUse" [style.width.%]="segments.plan"></div>
 								</div>
 								<small class="text-secondary text-nowrap">
-									other plans {{ rateFormatter.rate(status.usedByOthers, status.item) }} · {{ status.available === null ? '∞' : rateFormatter.rate(status.available, status.item) }} available
+									other plans {{ rateFormatter.rate(status.usedByOthers, status.item) }} · {{ rateFormatter.rate(status.available! - status.usedByPlan > 0 ? status.available! - status.usedByPlan : 0, status.item) }} unused
 								</small>
 								@if (status.overUse) {
 									<small class="text-danger d-block">Uses more than its share. Recalculate this plan.</small>
@@ -109,6 +109,10 @@
 					<th>Raw resource</th>
 					<th style="width: 260px;">Limit</th>
 					<th style="width: 120px;">Weight</th>
+					@if (planUsage() !== null) {
+						<th class="text-end">Used</th>
+						<th class="text-end">Unused</th>
+					}
 					@if (folderUsage() !== null) {
 						<th class="text-end" style="width: 140px;">Used by plans</th>
 					}
@@ -183,6 +187,10 @@
 								<span class="text-nowrap" [class.text-secondary]="!weightsEnabled()">{{ weightText(row.className) }}</span>
 							}
 						</td>
+						@if (planUsage() !== null) {
+							<td class="text-end text-nowrap" data-label="Used"><item-rate [amount]="planUsage()!.get(row.className) ?? 0" [item]="item(row.className)"></item-rate></td>
+							<td class="text-end text-nowrap" data-label="Unused"><item-rate [amount]="unusedOf(row)" [item]="item(row.className)"></item-rate></td>
+						}
 						@if (folderUsage() !== null) {
 							<td class="text-end text-nowrap" data-label="Used by plans" [class.text-danger]="folderOverUse(row)"><item-rate [amount]="folderUsageOf(row)" [item]="item(row.className)"></item-rate></td>
 						}

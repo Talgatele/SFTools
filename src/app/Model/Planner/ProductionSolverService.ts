@@ -42,6 +42,7 @@ import {RecipeNode} from '@src/Model/Planner/Solver/Response/RecipeNode';
 import {SinkNode} from '@src/Model/Planner/Solver/Response/SinkNode';
 import {SubplanNode} from '@src/Model/Planner/Solver/Response/SubplanNode';
 import {preferSpaceElevatorRecipes, satisfactoryRecipeRate, satisfactoryTargets} from '@src/Model/Planner/SatisfactoryTargets';
+import {SatisfactoryFactoryRefinement} from '@src/Model/Planner/SatisfactoryFactoryRefinement';
 
 @Injectable({providedIn: 'root'})
 export class ProductionSolverService
@@ -488,11 +489,13 @@ export class ProductionSolverService
 		return 'locked_' + node.id.replace(/-/g, '');
 	}
 
-	private buildLp(request: SolverRequest, data: Data, lockedNodes: Node[] = []): string
+	private buildLp(request: SolverRequest, data: Data, lockedNodes: Node[] = [], refinement?: SatisfactoryFactoryRefinement): string
 	{
 		const lines: string[] = ['\\\\ Production Plan', 'Minimize'];
 
-		if (request.maximise !== null) {
+		if (refinement) {
+			lines.push(refinement.objective);
+		} else if (request.maximise !== null) {
 			// The optimisation goals are applied by the follow-up fixed-rate solve.
 			lines.push('- 1 MaxRate');
 		} else {
@@ -743,6 +746,7 @@ export class ProductionSolverService
 			}
 		}
 
+		lines.push(...refinement?.constraints ?? []);
 		lines.push('\nBounds');
 		if (request.maximise?.maximumRate !== undefined) {
 			lines.push('MaxRate <= ' + request.maximise.maximumRate);
@@ -758,7 +762,10 @@ export class ProductionSolverService
 		}
 
 		request.productions.forEach(production => {
-			lines.push(production.item.className + '@Product = ' + production.amount);
+			const range = refinement?.productionRanges.get(production.item.className);
+			lines.push(range
+				? `${range.minimum} <= ${production.item.className}@Product <= ${range.maximum}`
+				: production.item.className + '@Product = ' + production.amount);
 		});
 
 		Object.entries(request.resourceLimits).forEach(([className, limit]) => {
@@ -779,11 +786,15 @@ export class ProductionSolverService
 			lines.push(this.lockedVariableName(node) + ' = 1');
 		});
 
-		if (sloopedRecipes.size) {
+		if (sloopedRecipes.size || refinement?.generals.length) {
 			lines.push('\nGeneral');
 			sloopedRecipes.forEach((value, key) => {
 				lines.push(key + '_count');
 			});
+			lines.push(...refinement?.generals ?? []);
+		}
+		if (refinement?.binaries.length) {
+			lines.push('\nBinary', ...refinement.binaries);
 		}
 
 
@@ -815,7 +826,7 @@ export class ProductionSolverService
 	{
 		const kept: {Name: string; Primal: number}[] = [];
 		for (const [Name, Primal] of columns) {
-			if (!(Math.abs(Primal) > 1e-6) || Name.endsWith('_count')
+			if (!(Math.abs(Primal) > 1e-6) || Name.endsWith('_count') || Name.startsWith('sf_')
 			// Locked nodes pass through from the existing graph, never rebuilt.
 				|| Name.startsWith('locked_')
 			// Surpluses and the maximise loop's bookkeeping are not graph nodes (@Carry is netted into @Byproduct before parsing).
@@ -908,6 +919,7 @@ export class ProductionSolverService
 		const automatic = maximise.items.filter(item => rows.some(row => row.itemClassName === item.className
 			&& row.satisfactoryOverride === undefined));
 		const targets = satisfactoryTargets(data, request.recipes, automatic);
+		const automaticCaps = new Map(targets.map(target => [target.item.className, target.rate ?? Infinity]));
 		for (const target of targets.filter(target => target.rate !== null)) {
 			let cap = target.rate!;
 			// Inspect the selected route for its batch size or elevator throughput.
@@ -937,6 +949,7 @@ export class ProductionSolverService
 			}
 			const maximum = Math.max(0, this.columnsOf(solution).get('MaxRate') ?? 0);
 			const rate = this.cleanProductionRate(Math.min(cap, maximum));
+			automaticCaps.set(target.item.className, cap);
 			request = {...request, maximise: null, productions: [...request.productions, {item: target.item, amount: rate}]};
 			achieved[target.item.className] = rate;
 		}
@@ -955,7 +968,28 @@ export class ProductionSolverService
 		}
 		// Rebuild from all targets together: rounded rates must change the factory,
 		// and cancellation must still terminate the active worker.
-		const solution = await this.awaitSolve(this.buildLp(request, data, lockedNodes), this.solveOptions(request, plan), run);
+		let solution = await this.awaitSolve(this.buildLp(request, data, lockedNodes), this.solveOptions(request, plan), run);
+		if (this.mapStatus(solution.Status) === 'Optimal' && automatic.length > 0) {
+			const baseline = this.columnsOf(solution);
+			const refinement = new SatisfactoryFactoryRefinement(request, baseline, automaticCaps);
+			if (refinement.score(baseline) > 1e-5) {
+				try {
+					const simpler = await this.awaitSolve(this.buildLp(request, data, lockedNodes, refinement), {
+						workerOptions: {mipRelGap: 0.01, timeLimitSeconds: 5}, timeoutMs: 10_000,
+					}, run);
+					if (this.mapStatus(simpler.Status) === 'Optimal'
+						&& refinement.score(this.columnsOf(simpler)) < refinement.score(baseline) - 1e-5) {
+						solution = simpler;
+						const columns = this.columnsOf(solution);
+						for (const item of automatic) achieved[item.className] = columns.get(item.className + '@Product') ?? 0;
+					}
+				} catch (error) {
+					if (run.cancelled) throw error;
+					// A failed or timed-out refinement must not lose the already valid factory.
+					console.warn('Satisfactory factory simplification kept the original plan:', error);
+				}
+			}
+		}
 		const response = this.parseSolution(solution, data, this.groupingModes.resolve(plan.settings));
 		return {...response, nodes: [...response.nodes, ...this.augmenterNodes(plan, data)], achievedMaximums: achieved};
 	}

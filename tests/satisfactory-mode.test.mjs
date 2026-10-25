@@ -15,6 +15,7 @@ import {preferSpaceElevatorRecipes, satisfactoryRecipeRate, satisfactoryTargets}
 import {SubplanScaler} from '../src/app/Model/Planner/SubplanScaler.ts';
 import {PlanLabelAssigner} from '../src/app/Model/Planner/PlanLabelAssigner.ts';
 import {PlanIconResolver} from '../src/app/Model/Planner/PlanIconResolver.ts';
+import {GraphEdgeBuilder} from '../src/app/Model/Planner/Graph/GraphEdgeBuilder.ts';
 
 // Exercise the worker's precision restoration as well as the real HiGHS engine.
 // Unpatched HiGHS rounds to six significant figures and can make boundary cases infeasible.
@@ -63,8 +64,10 @@ const base = (limit = 720, enabled = recipes.filter(recipe => !recipe.alternate)
 	generators: [], extraPower: ExtraPower.NONE, powerDemand: 0, sinkPointsDemand: 0,
 	producePowerForFactory: false, excessPowerFraction: 0, disabledByproducts: [], sinkableItems: [],
 });
-const solver = {solve: lp => {
-	const solution = highs.solve(lp, {presolve: 'on', output_flag: false});
+const solver = {solve: (lp, options) => {
+	const solution = highs.solve(lp, {presolve: 'on', output_flag: false,
+		mip_rel_gap: options?.workerOptions?.mipRelGap ?? 0.05,
+		time_limit: options?.workerOptions?.timeLimitSeconds ?? Infinity});
 	restoreFullPrecisionPrimals(solution);
 	return of(solution);
 }};
@@ -122,15 +125,96 @@ test('Radio Control Units use supplied casings, computers and oscillators with m
 	assert.ok(Math.abs(casing.amount - supplied.achievedMaximums.RadioControlUnit * 16) < 0.001);
 });
 
-test('720 ore: reserve recipe batches and maximise clean basic rates', async () => {
+test('720 ore: reserve recipe batches and maximise basic rates before simplifying the factory', async () => {
 	const rates = check(await run());
 	assert.equal(rates.Desc_SpaceElevatorPart_1_C, 4);
 	assert.equal(rates.Frame, 10);
 	assert.equal(rates.Motor, 5);
 	for (const name of ['Screw', 'Rod', 'Plate']) {
 		assert.ok(rates[name] > 0);
-		assert.ok(Math.abs(rates[name] * 10 - Math.round(rates[name] * 10)) < 1e-8);
 	}
+});
+
+const withoutRefinement = {solve: (lp, options) => {
+	if (lp.includes('sf_')) return of({Status: 'Infeasible', Columns: {}});
+	return solver.solve(lp, options);
+}};
+
+test('manifold refinement cleans real iron-chain flows within 2% of each baseline output', async () => {
+	const times = {Smelt: 2, Rods: 4, Plates: 6, Screws: 6, ReinforcedPlates: 12,
+		Rotors: 15, Frames: 60, SmartPlating: 30};
+	const realRecipes = recipes.filter(recipe => times[recipe.className]).map(recipe => ({...recipe, time: times[recipe.className]}));
+	const realData = {...data, getRecipesForMachines: () => realRecipes,
+		getRecipeByClassName: name => realRecipes.find(recipe => recipe.className === name)};
+	const p = plan();
+	p.requests = p.requests.filter(row => row.itemClassName !== 'Motor');
+	p.requests.find(row => row.itemClassName === 'ReinforcedPlate').satisfactoryOverride = 15;
+	const request = base(720, realRecipes);
+	const solve = instance => firstValueFrom(instance.solveMaximise(p, realData, request,
+		{category: 'items', satisfactory: true, items: p.requests.map(row => item(row.itemClassName))}, []));
+	const original = await solve(service(withoutRefinement));
+	const refined = await solve(service());
+	check(refined);
+	for (const row of p.requests) {
+		const name = row.itemClassName;
+		assert.ok(refined.achievedMaximums[name] >= original.achievedMaximums[name] * 0.98 - 1e-6, name);
+	}
+	assert.equal(refined.achievedMaximums.ReinforcedPlate, 15);
+	const machineCount = response => response.nodes.filter(node => node.type === 'recipe').reduce((sum, node) => sum + node.amount, 0);
+	assert.ok(machineCount(refined) <= machineCount(original) + 2);
+	const internal = response => response.nodes.filter(node => node.type === 'recipe')
+		.flatMap(node => [...node.inputs, ...node.outputs].map(io => io.maxAmount));
+	const fractional = rates => rates.filter(rate => Math.abs(rate - Math.round(rate)) > 1e-5).length;
+	assert.ok(fractional(internal(refined)) < fractional(internal(original)));
+	const edges = new GraphEdgeBuilder().build(refined.nodes);
+	assert.ok(edges.every(edge => Math.abs(edge.amount * 10 - Math.round(edge.amount * 10)) < 1e-4));
+});
+
+test('optional simplification failures preserve the original factory and exact custom targets', async () => {
+	const p = plan();
+	p.requests[0].satisfactoryOverride = 15.125;
+	const baseline = await run(p, base(), service(withoutRefinement));
+	const failed = {solve: (lp, options) => {
+		if (lp.includes('sf_')) return new Observable(subscriber => subscriber.error(new Error('Refinement timed out')));
+		return solver.solve(lp, options);
+	}};
+	const result = await run(p, base(), service(failed));
+	assert.deepEqual(check(result), check(baseline));
+	assert.equal(result.achievedMaximums.Screw, 15.125);
+});
+
+test('fractional final output is preferred when it makes upstream production whole', async () => {
+	const realRecipes = [recipe('Smelt', {Ore: 3}, {Ingot: 2}), recipe('Rods', {Ingot: 1}, {Rod: 1})];
+	const realData = {...data, getRecipesForMachines: () => realRecipes,
+		getRecipeByClassName: name => realRecipes.find(recipe => recipe.className === name)};
+	const p = {...plan(), requests: [
+		{itemClassName: 'Ingot', mode: 'satisfactory', ratePerMinute: 0},
+		{itemClassName: 'Rod', mode: 'satisfactory', ratePerMinute: 0, satisfactoryOverride: 15.125},
+	]};
+	const result = await firstValueFrom(service().solveMaximise(p, realData, base(66, realRecipes),
+		{category: 'items', satisfactory: true, items: [item('Ingot'), item('Rod')]}, []));
+	check(result);
+	assert.ok(Math.abs(result.achievedMaximums.Ingot - 28.875) < 1e-6);
+	assert.equal(result.achievedMaximums.Rod, 15.125);
+	assert.equal(result.nodes.find(node => node.type === 'mine').amount, 66);
+	assert.equal(result.nodes.find(node => node.type === 'recipe' && node.recipe.className === 'Smelt').outputs[0].maxAmount, 44);
+});
+
+test('cancellation during simplification terminates its worker subscription', async () => {
+	let cancelled = false;
+	let subscription;
+	await new Promise((resolve, reject) => {
+		const hanging = {solve: (lp, options) => {
+			if (lp.includes('sf_')) return new Observable(() => {
+				queueMicrotask(() => {subscription.unsubscribe(); resolve();});
+				return () => {cancelled = true;};
+			});
+			return solver.solve(lp, options);
+		}};
+		subscription = service(hanging).solveMaximise(plan(), data, base(),
+			{category: 'items', satisfactory: true, items: selection.map(item)}, []).subscribe({error: reject});
+	});
+	assert.equal(cancelled, true);
 });
 
 test('custom 15/min stays fixed, advanced targets persist, basic rates recalculate, reset restores defaults', async () => {

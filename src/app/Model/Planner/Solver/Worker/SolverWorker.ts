@@ -99,6 +99,7 @@ addEventListener('message', async ({data}: MessageEvent<SolverWorkerRequest>) =>
             mip_heuristic_effort: 0.3,
             mip_detect_symmetry: true,
             mip_rel_gap: options?.mipRelGap ?? 0.05,
+            time_limit: options?.timeLimitSeconds ?? Infinity,
             small_matrix_value: 1e-7,
             primal_feasibility_tolerance: 1e-9,
             dual_feasibility_tolerance: 1e-9,

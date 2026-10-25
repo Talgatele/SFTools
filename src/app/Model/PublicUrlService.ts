@@ -1,10 +1,11 @@
 import {Injectable} from '@angular/core';
+import {env} from '@env/env';
 
 @Injectable({providedIn: 'root'})
 export class PublicUrlService
 {
 	public url(path: string): string
 	{
-		return window.location.origin + path;
+		return env.webUrl + path;
 	}
 }

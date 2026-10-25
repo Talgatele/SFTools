@@ -74,6 +74,11 @@ export class CalculatorResourcesTabComponent implements OnDestroy
 		return this.pool.usageInFolder(folder.id);
 	});
 
+	public readonly planUsage: Signal<Map<string, number> | null> = computed(() => {
+		const plan = this.planManager.activePlan();
+		return plan?.graph ? this.pool.usageOfPlan(plan) : null;
+	});
+
 	public readonly weightsEnabled: Signal<boolean> = computed(() =>
 		this.planManager.activeSettings()?.optimisation?.rawResources ?? true);
 
@@ -144,6 +149,12 @@ export class CalculatorResourcesTabComponent implements OnDestroy
 	public folderUsageOf(row: ResourceLimitRow): number
 	{
 		return this.folderUsage()?.get(row.className) ?? 0;
+	}
+
+	public unusedOf(row: ResourceLimitRow): number | null
+	{
+		return row.enabled && row.infinite ? null
+			: Math.max(0, (row.enabled ? row.limit : 0) - (this.planUsage()?.get(row.className) ?? 0));
 	}
 
 	public folderOverUse(row: ResourceLimitRow): boolean

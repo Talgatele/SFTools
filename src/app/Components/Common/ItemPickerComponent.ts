@@ -32,6 +32,7 @@ export class ItemPickerComponent
 	@Input() public value = '';
 	@Input() public placeholder = '- select -';
 	@Output() public valueChange = new EventEmitter<string>();
+	@Output() public selectionConfirmed = new EventEmitter<void>();
 
 	@ViewChild('searchInput') private searchInput?: ElementRef<HTMLInputElement>;
 	@ViewChild('dropdown') private dropdown?: BsDropdownDirective;
@@ -75,6 +76,7 @@ export class ItemPickerComponent
 	/** Keyboard handling lives on the search box; the options are never focused, so the caret stays where the user types. */
 	public onSearchKeyDown(event: KeyboardEvent, dropdown: BsDropdownDirective): void
 	{
+		if (event.isComposing) return;
 		const options = this.filtered;
 		switch (event.key) {
 			case 'ArrowDown':
@@ -95,9 +97,12 @@ export class ItemPickerComponent
 				break;
 			case 'Enter': {
 				event.preventDefault();
+				event.stopPropagation();
+				if (event.repeat) break;
 				const option = options[this.highlighted];
 				if (option) {
 					this.select(option, dropdown);
+					this.selectionConfirmed.emit();
 				}
 				break;
 			}
@@ -116,6 +121,8 @@ export class ItemPickerComponent
 		// The menu isn't in the DOM the instant onShown fires, and ngx-bootstrap focuses the toggle a frame later - poll briefly to win that race.
 		let tries = 0;
 		const attempt = () => {
+			// A confirmed selection may already have opened the next row's picker.
+			if (!this.dropdown?.isOpen) return;
 			const input = this.searchInput?.nativeElement
 				?? document.querySelector<HTMLInputElement>('.dropdown-menu.show input[type="search"]');
 			input?.focus();
