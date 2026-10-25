@@ -1995,6 +1995,23 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 			this.planManager.setGraph(plan.id, graph);
 		}
 		this.plannerGraph.restore(this.graphContainerRef.nativeElement, graph, !keepViewport);
+		this.scheduleGraphFit(plan.id);
+	}
+
+	/** Plan switches can leave canvas visibility stale while the graph tab stays active. Reapply it after the panel resizes, then fit. */
+	private scheduleGraphFit(planId: string): void
+	{
+		if (this.calculatorTabs.activeTab() !== 'graph') return;
+		requestAnimationFrame(() => requestAnimationFrame(() => {
+			if (this.planManager.activePlanId() === planId && this.calculatorTabs.activeTab() === 'graph') {
+				if (this.panelLayout.graphViewActive()) {
+					const container = this.graphContainerRef.nativeElement;
+					container.style.visibility = 'visible';
+					container.style.pointerEvents = 'auto';
+				}
+				this.plannerGraph.zoomFit(true);
+			}
+		}));
 	}
 
 	private calculate(): void
@@ -2040,6 +2057,7 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 					if (calculationGeneration !== this.calculationGeneration || this.planManager.activePlanId() !== plan.id) return;
 					this.renderedPlanId = plan.id;
 					this.plannerGraph.restore(this.graphContainerRef.nativeElement, graph);
+					this.scheduleGraphFit(plan.id);
 					this.planManager.setGraph(plan.id, graph, false);
 					// Undefined clears stale maximise results.
 					this.planManager.setAchievedMaximums(plan.id, result.achievedMaximums);

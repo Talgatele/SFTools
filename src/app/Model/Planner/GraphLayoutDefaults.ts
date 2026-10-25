@@ -5,7 +5,7 @@ export class GraphLayoutDefaults
 
 	public static readonly SETTINGS: GraphLayoutSettings = {
 		direction: 'left',
-		edgeShape: 'multisegment',
+		edgeShape: 'straight',
 		nodeSpacing: 20,
 		layerSpacing: 20,
 		machineColors: {},
