@@ -138,6 +138,7 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 
 	private readonly subscription = new Subscription();
 	private calcSubscription: Subscription | null = null;
+	private calculationGeneration = 0;
 	private renderedPlanId: string | null = null;
 	private keepViewportForPlanId: string | null = null;
 
@@ -456,7 +457,7 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 			this.actions.redoRequests.subscribe(() => this.redo()),
 		);
 
-		// pairwise + same-id guard: plan switches and graph saves must not trigger a solve.
+		// Recalculate automatic plans when their requests change or when another plan is selected.
 		this.subscription.add(
 			toObservable(computed(() => {
 				const plan = this.planManager.activePlan();
@@ -488,8 +489,7 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 				filter(([previous, current]) =>
 					previous !== null && current !== null
 					&& current.mode === 'automatic'
-					&& current.id === previous.id
-					&& current.requestsKey !== previous.requestsKey),
+					&& (current.id !== previous.id || current.requestsKey !== previous.requestsKey)),
 				debounceTime(200),
 			).subscribe(() => {
 				const plan = this.planManager.activePlan();
@@ -614,6 +614,9 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 		this.subscription.add(
 			toObservable(this.planManager.activePlan).pipe(skip(1)).subscribe(plan => {
 				if (plan?.id === this.renderedPlanId && (plan === null || this.planManager.isReadOnlyPlan(plan.id) === this.plannerGraph.readOnly)) return;
+				if (plan?.id !== this.renderedPlanId) {
+					this.cancelCalculation();
+				}
 				this.actions.setSolveError(null);
 				this.renderPlan(plan);
 			}),
@@ -2003,6 +2006,7 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 			if (this.modeOf(plan) !== 'automatic') return;
 			this.cancelCalculation();
 		}
+		const calculationGeneration = ++this.calculationGeneration;
 		const validRequests = plan.requests.filter(r => r.itemClassName !== '');
 
 		// Append mode's island is self-contained by design, so no locks.
@@ -2025,6 +2029,7 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 		this.actions.setSolveError(null);
 		this.calcSubscription = result$.pipe(finalize(() => this.actions.setCalculating(false))).subscribe({
 			next: result => {
+				if (calculationGeneration !== this.calculationGeneration || this.planManager.activePlanId() !== plan.id) return;
 				if (result.status !== 'Optimal') {
 					this.actions.setSolveError('no solution');
 					this.explainSolveFailure({...plan, requests: validRequests}, lockedNodes);
@@ -2032,15 +2037,19 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 				}
 				this.history.push(this.snapshotOf(plan));
 				void this.applyResult(plan, result, existing).then(graph => {
+					if (calculationGeneration !== this.calculationGeneration || this.planManager.activePlanId() !== plan.id) return;
 					this.renderedPlanId = plan.id;
+					this.plannerGraph.restore(this.graphContainerRef.nativeElement, graph);
 					this.planManager.setGraph(plan.id, graph, false);
 					// Undefined clears stale maximise results.
 					this.planManager.setAchievedMaximums(plan.id, result.achievedMaximums);
 				}).catch(err => {
+					if (calculationGeneration !== this.calculationGeneration || this.planManager.activePlanId() !== plan.id) return;
 					this.actions.setSolveError('error', 'Could not draw the graph: ' + String(err) + '. Please reload the page and try again.');
 				});
 			},
 			error: err => {
+				if (calculationGeneration !== this.calculationGeneration || this.planManager.activePlanId() !== plan.id) return;
 				console.error('Solver error:', err);
 				this.actions.setSolveError('error', 'Calculation failed: ' + String(err instanceof Error ? err.message : err));
 			},
@@ -2050,6 +2059,7 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 	/** Unsubscribing kills the solver worker. */
 	private cancelCalculation(): void
 	{
+		this.calculationGeneration++;
 		this.calcSubscription?.unsubscribe();
 		this.calcSubscription = null;
 	}
@@ -2066,16 +2076,13 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 
 	private async applyResult(plan: Plan, result: SolverResponse, existing: Graph | null): Promise<Graph>
 	{
-		const container = this.graphContainerRef.nativeElement;
 		const mode = this.modeOf(plan);
 		const hasLocks = existing?.nodes.some(node => node.locked) ?? false;
 
 		if (existing && mode === 'manual-append') {
 			const additionEdges = this.edgeBuilder.build(result.nodes);
 			await this.plannerGraph.layout(result.nodes, additionEdges, plan.settings.graph);
-			const graph = this.graphComposer.append(existing, {nodes: result.nodes, edges: additionEdges});
-			this.plannerGraph.restore(container, graph);
-			return graph;
+			return this.graphComposer.append(existing, {nodes: result.nodes, edges: additionEdges});
 		}
 
 		if (existing && mode === 'manual-upgrade') {
@@ -2084,9 +2091,7 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 				await this.plannerGraph.layout(merged.newNodes, merged.edges, plan.settings.graph);
 				this.graphComposer.offsetBelow(merged.newNodes, merged.edges, existing.nodes);
 			}
-			const graph: Graph = {nodes: merged.nodes, edges: merged.edges};
-			this.plannerGraph.restore(container, graph);
-			return graph;
+			return {nodes: merged.nodes, edges: merged.edges};
 		}
 
 		this.graphComposer.carryDone(existing, result.nodes);
@@ -2094,12 +2099,12 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 		if (existing && hasLocks) {
 			const rebuilt = this.graphComposer.rebuild(existing, result.nodes);
 			await this.plannerGraph.layout(rebuilt.nodes, rebuilt.edges, plan.settings.graph);
-			const graph: Graph = {nodes: rebuilt.nodes, edges: rebuilt.edges};
-			this.plannerGraph.restore(container, graph);
-			return graph;
+			return {nodes: rebuilt.nodes, edges: rebuilt.edges};
 		}
 
-		return this.plannerGraph.render(container, result, plan.settings.graph);
+		const edges = this.edgeBuilder.build(result.nodes);
+		await this.plannerGraph.layout(result.nodes, edges, plan.settings.graph);
+		return {nodes: result.nodes, edges};
 	}
 
 	private existingGraph(plan: Plan): Graph | null

@@ -87,6 +87,41 @@ const check = response => {
 	return response.achievedMaximums;
 };
 
+test('Radio Control Units use supplied casings, computers and oscillators with mining disabled', async () => {
+	const parts = ['Computer', 'AluminumCasing', 'AlcladAluminumSheet', 'CrystalOscillator', 'RadioControlUnit']
+		.map(className => Object.assign(Object.create(Item.prototype), {className, sinkPoints: 0, form: 'solid'}));
+	const part = name => parts.find(item => item.className === name);
+	const radioRecipe = {...recipe('RadioControlUnits', {}, {}), time: 48,
+		ingredients: [['AluminumCasing', 32], ['CrystalOscillator', 1], ['Computer', 2]]
+			.map(([name, amount]) => ({item: part(name), amount})),
+		products: [{item: part('RadioControlUnit'), amount: 2}]};
+	const radioData = {...data, items: [...items, ...parts], getRecipesForMachines: () => [radioRecipe],
+		getItemByClassName: name => part(name) ?? item(name), searchItemByClassName: name => part(name) ?? item(name),
+		getRecipeByClassName: name => name === radioRecipe.className ? radioRecipe : undefined};
+	const p = {...plan(), requests: [{itemClassName: 'RadioControlUnit', mode: 'satisfactory', ratePerMinute: 0}]};
+	const request = {...base(0, [radioRecipe]), resourceLimits: {Ore: 0, Plastic: 0}};
+	request.optimisation.inputs = true;
+	const solveWith = aluminum => {
+		request.inputs = [['Computer', 83.52], [aluminum, 2.66], ['CrystalOscillator', 30.72]]
+			.map(([name, weight]) => ({item: part(name), amount: 100, weight}));
+		return firstValueFrom(service().solveMaximise(p, radioData, request,
+			{category: 'items', satisfactory: true, items: [part('RadioControlUnit')]}, []));
+	};
+	const missing = await solveWith('AlcladAluminumSheet');
+	assert.equal(missing.status, 'Optimal');
+	assert.equal(missing.achievedMaximums.RadioControlUnit, 0);
+	assert.ok(!missing.nodes.some(node => node.type === 'recipe'));
+	const supplied = await solveWith('AluminumCasing');
+	assert.equal(supplied.status, 'Optimal');
+	assert.ok(supplied.achievedMaximums.RadioControlUnit > 0);
+	assert.ok(supplied.nodes.some(node => node.type === 'recipe' && node.recipe.className === 'RadioControlUnits'));
+	assert.equal(supplied.nodes.filter(node => node.type === 'input').length, 3);
+	assert.ok(!supplied.nodes.some(node => node.type === 'mine'));
+	const casing = supplied.nodes.find(node => node.type === 'input' && node.item === part('AluminumCasing'));
+	assert.ok(casing.amount <= 100);
+	assert.ok(Math.abs(casing.amount - supplied.achievedMaximums.RadioControlUnit * 16) < 0.001);
+});
+
 test('720 ore: reserve recipe batches and maximise clean basic rates', async () => {
 	const rates = check(await run());
 	assert.equal(rates.Desc_SpaceElevatorPart_1_C, 4);
