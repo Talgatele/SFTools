@@ -1,11 +1,11 @@
-import {Component, ElementRef, OnDestroy, Signal, ViewChild, computed, effect, signal, ChangeDetectionStrategy} from '@angular/core';
+import {Component, ElementRef, OnDestroy, Signal, ViewChild, computed, effect, signal, ChangeDetectionStrategy, untracked} from '@angular/core';
 import {DatePipe, NgTemplateOutlet} from '@angular/common';
 import {FaIconComponent} from '@fortawesome/angular-fontawesome';
 import {BsDropdownModule} from 'ngx-bootstrap/dropdown';
 import {AppTooltipDirective} from '@src/Components/Common/AppTooltipDirective';
 import {InfoNoteComponent} from '@src/Components/Common/InfoNoteComponent';
 import {CalculatorTabsMode} from '@src/Components/Planner/Panels/Calculator/CalculatorTabsMode';
-import {faCopy, faDownload, faEllipsis, faFileImport, faLock, faPlay, faRotateLeft, faShareNodes, faSitemap, faSliders, faXmark} from '@fortawesome/free-solid-svg-icons';
+import {faCopy, faDownload, faEllipsis, faFileImport, faIndustry, faLock, faPlay, faRotateLeft, faShareNodes, faSitemap, faSliders, faXmark} from '@fortawesome/free-solid-svg-icons';
 import {CalculationModeOption} from '@src/Components/Planner/Panels/Calculator/CalculationModeOption';
 import {HelpButtonComponent} from '@src/Components/Help/HelpButtonComponent';
 import {HelpTopicId} from '@src/Model/Help/HelpTopicId';
@@ -30,7 +30,6 @@ import {CalculatorSinkTabComponent} from '@src/Components/Planner/Panels/Calcula
 import {CalculatorSloopsTabComponent} from '@src/Components/Planner/Panels/Calculator/Tabs/Sloops/CalculatorSloopsTabComponent';
 import {PlannerActionsService} from '@src/Components/Planner/PlannerActionsService';
 import {PlannerGraphService} from '@src/Components/Planner/PlannerGraphService';
-import {PanelLayoutService} from '@src/Components/Planner/Panel/PanelLayoutService';
 import {CalculatorTabHotkeys} from '@src/Components/Planner/Panels/Calculator/CalculatorTabHotkeys';
 import {HotkeyService} from '@src/Model/Hotkeys/HotkeyService';
 import {NotificationService} from '@src/Model/NotificationService';
@@ -40,6 +39,8 @@ import {FolderGroupMode} from '@src/Model/Planner/FolderGroupMode';
 import {Plan} from '@src/Model/Planner/Plan';
 import {VersionManager} from '@src/Model/Data/VersionManager';
 import {PlanManager} from '@src/Model/Planner/PlanManager';
+import {MapPanelRequests} from '@src/Components/Map/MapPanelRequests';
+import {PanelLayoutService} from '@src/Components/Planner/Panel/PanelLayoutService';
 import {SettingsManager} from '@src/Model/Settings/SettingsManager';
 import {PlanNameResolver} from '@src/Model/Planner/PlanNameResolver';
 import {PlanSettings} from '@src/Model/Planner/PlanSettings';
@@ -194,6 +195,7 @@ export class CalculatorComponent implements OnDestroy
 	public readonly faPlay = faPlay;
 	public readonly faRotateLeft = faRotateLeft;
 	public readonly faSitemap = faSitemap;
+	public readonly faIndustry = faIndustry;
 	public readonly faShareNodes = faShareNodes;
 	public readonly faXmark = faXmark;
 	public readonly faEllipsis = faEllipsis;
@@ -227,6 +229,11 @@ export class CalculatorComponent implements OnDestroy
 	public readonly calculateHint: Signal<string>;
 	public readonly hasGraph: Signal<boolean>;
 
+	public readonly mapAvailable: Signal<boolean> = computed(() => {
+		const data = this.versionManager.activeVersionData();
+		return data !== null && data.mapId !== null && data.worldNodesPath !== null;
+	});
+
 	public readonly folderHasCustomSettings: Signal<boolean>;
 
 	public readonly parentLabel: Signal<string>;
@@ -251,7 +258,7 @@ export class CalculatorComponent implements OnDestroy
 
 	public readonly recalculationProgress: Signal<FolderRecalculationProgress | null>;
 
-	private readonly loadFromSaveSignal = signal<{name: string; baseSettings: PlanSettings} | null>(null);
+	private readonly loadFromSaveSignal = signal<{name: string} | null>(null);
 	public readonly loadFromSave = this.loadFromSaveSignal.asReadonly();
 
 	public constructor(
@@ -270,6 +277,7 @@ export class CalculatorComponent implements OnDestroy
 		private readonly settingsManager: SettingsManager,
 		private readonly panelLayout: PanelLayoutService,
 		private readonly plannerGraph: PlannerGraphService,
+		private readonly mapPanelRequests: MapPanelRequests,
 	)
 	{
 		this.activeTab = tabState.activeTab;
@@ -407,7 +415,8 @@ export class CalculatorComponent implements OnDestroy
 		if (elements.some(element => element === null) || typeof ResizeObserver === 'undefined') {
 			return;
 		}
-		this.tabsResizeObserver = new ResizeObserver(() => this.updateTabsMode());
+		// Firefox has fired this while a computed was mid-evaluation, where the signal write throws NG0600.
+		this.tabsResizeObserver = new ResizeObserver(() => untracked(() => this.updateTabsMode()));
 		elements.forEach(element => this.tabsResizeObserver?.observe(element as HTMLElement));
 		this.updateTabsMode();
 	}
@@ -480,6 +489,12 @@ export class CalculatorComponent implements OnDestroy
 		}
 	}
 
+	public openFactorySites(): void
+	{
+		this.mapPanelRequests.request('sites');
+		this.panelLayout.focusPanel('map');
+	}
+
 	public relayout(): void
 	{
 		this.actions.requestRelayout();
@@ -545,31 +560,29 @@ export class CalculatorComponent implements OnDestroy
 		const plan = this.activePlan();
 		const folder = this.activeFolder();
 		if (plan) {
-			this.loadFromSaveSignal.set({
-				name: this.planNames.displayName(plan),
-				baseSettings: this.planManager.cloneSettings(plan.settings),
-			});
+			this.loadFromSaveSignal.set({name: this.planNames.displayName(plan)});
 		} else if (folder) {
-			// effectiveFolderSettings covers a folder still inheriting; applying the save then gives it custom settings.
-			this.loadFromSaveSignal.set({
-				name: folder.name,
-				baseSettings: this.planManager.effectiveFolderSettings(folder.id),
-			});
+			this.loadFromSaveSignal.set({name: folder.name});
 		}
 	}
 
-	public onLoadFromSaveApply(settings: PlanSettings): void
+	/** Applied to the settings as they are now: loading the map's part may have just counted a resource area again. */
+	public onLoadFromSaveApply(patch: Partial<PlanSettings> | null): void
 	{
 		const target = this.loadFromSaveSignal();
 		const plan = this.activePlan();
 		const folder = this.activeFolder();
 		if (target) {
-			if (plan) {
-				this.planManager.updateActiveSettings(settings);
+			if (patch === null) {
+				this.notifications.showSuccess('Loaded your game from the save file.');
+			} else if (plan) {
+				this.planManager.updateActiveSettings({...plan.settings, ...patch});
+				this.notifications.showSuccess(`Loaded settings from the save file into "${target.name}".`);
 			} else if (folder) {
-				this.planManager.setFolderSettings(folder.id, settings);
+				// effectiveFolderSettings covers a folder still inheriting; applying the save then gives it custom settings.
+				this.planManager.setFolderSettings(folder.id, {...this.planManager.effectiveFolderSettings(folder.id), ...patch});
+				this.notifications.showSuccess(`Loaded settings from the save file into "${target.name}".`);
 			}
-			this.notifications.showSuccess(`Loaded settings from the save file into "${target.name}".`);
 		}
 		this.loadFromSaveSignal.set(null);
 	}

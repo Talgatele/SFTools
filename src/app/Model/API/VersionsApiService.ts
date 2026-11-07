@@ -11,6 +11,7 @@ import {VersionDataLocation} from '@src/Model/API/Schema/VersionDataLocation';
 import {VersionFile} from '@src/Model/API/Schema/VersionFile';
 import {WorldDataPreview} from '@src/Model/API/Schema/World/WorldDataPreview';
 import {WorldDataRequest} from '@src/Model/API/Schema/World/WorldDataRequest';
+import {VersionFileCaching} from '@src/Model/API/VersionFileCaching';
 import {VersionResponseParser} from '@src/Model/API/VersionResponseParser';
 
 @Injectable({providedIn: 'root'})
@@ -69,10 +70,9 @@ export class VersionsApiService
 		);
 	}
 
-	/** The URL is immutable-cacheable, so no cache-busting parameters - they would bypass the browser cache. */
 	private fetchVersionFile(dataPath: string): Observable<VersionFile>
 	{
-		return this.http.get<VersionFile>(`${env.apiUrl}/${dataPath}`);
+		return this.http.get<VersionFile>(`${env.apiUrl}/${dataPath}`, {cache: VersionFileCaching.mode(dataPath)});
 	}
 
 }

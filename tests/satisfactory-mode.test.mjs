@@ -58,7 +58,7 @@ const data = {items, resources: ['Ore', 'Plastic'], getRecipesForMachines: () =>
 const selection = ['Screw', 'Rod', 'Plate', 'ReinforcedPlate', 'Rotor', 'Motor', 'Frame', 'Desc_SpaceElevatorPart_1_C'];
 const plan = () => ({settings: {}, requests: selection.map(itemClassName => ({itemClassName, mode: 'satisfactory', ratePerMinute: 0}))});
 const base = (limit = 720, enabled = recipes.filter(recipe => !recipe.alternate)) => ({
-	optimisation: {rawResources: {Ore: 1, Plastic: 1}, power: 0, machines: 0, inputs: false}, maximise: null,
+	optimisation: {rawResources: {Ore: 1, Plastic: 1}, power: 0, machines: 0, machineWeights: {}, wholeMachines: false, inputs: false}, maximise: null,
 	recipes: enabled, productions: [], inputs: [], carryInputs: [], maxSloops: 0, defaultClockSpeed: 100,
 	recipeClockSpeeds: {}, machineClockSpeeds: {}, generatorClockSpeeds: {}, resourceLimits: {Ore: limit, Plastic: 100},
 	generators: [], extraPower: ExtraPower.NONE, powerDemand: 0, sinkPointsDemand: 0,
@@ -89,6 +89,33 @@ const check = response => {
 	for (const [name, balance] of balances) assert.ok(Math.abs(balance) < 0.001, `${name} balance: ${balance}`);
 	return response.achievedMaximums;
 };
+
+test('machine weights select the cheaper building and whole counting charges complete machines', async () => {
+	const otherMachine = {...machine, className: 'Assembler'};
+	const request = {...base(), recipes: [{...recipes[0], producedIn: [machine, otherMachine]}],
+		productions: [{item: item('Ingot'), amount: 1.25}]};
+	request.optimisation = {...request.optimisation, machines: 10, machineWeights: {Assembler: 1}};
+	for (const wholeMachines of [false, true]) {
+		request.optimisation.wholeMachines = wholeMachines;
+		const solution = await firstValueFrom(solver.solve(service().buildLp(request, data)));
+		assert.equal(solution.Status, 'Optimal');
+		const values = new Map(Object.values(solution.Columns).map(column => [column.Name, column.Primal]));
+		assert.equal(values.get('Smelt@Constructor%100#0'), 0);
+		assert.equal(values.get('Smelt@Assembler%100#0'), 1.25);
+		if (wholeMachines) assert.equal(values.get('Smelt@Assembler%100#0_count'), 2);
+	}
+});
+
+test('Satisfactory refinement still balances production with upstream whole-machine objectives', async () => {
+	const request = base();
+	request.optimisation = {...request.optimisation, machines: 0.1, machineWeights: {Constructor: 0.2}, wholeMachines: true};
+	const p = plan();
+	p.requests.find(row => row.itemClassName === 'Motor').satisfactoryOverride = 3.25;
+	const result = await run(p, request);
+	const rates = check(result);
+	assert.equal(rates.Motor, 3.25);
+	assert.ok(rates.Desc_SpaceElevatorPart_1_C > 0);
+});
 
 test('Radio Control Units use supplied casings, computers and oscillators with mining disabled', async () => {
 	const parts = ['Computer', 'AluminumCasing', 'AlcladAluminumSheet', 'CrystalOscillator', 'RadioControlUnit']

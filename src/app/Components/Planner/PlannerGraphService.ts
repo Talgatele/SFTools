@@ -1,4 +1,4 @@
-import {Injectable, OnDestroy, Signal, signal} from '@angular/core';
+import {Injectable, OnDestroy, Signal, signal, untracked} from '@angular/core';
 import {faCircleCheck, faLock, faTriangleExclamation, IconDefinition} from '@fortawesome/free-solid-svg-icons';
 import {Cell, Edge as X6Edge, EdgeToolNativeItem, EdgeView, Export, Graph as X6Graph, Node as X6Node, Selection} from '@antv/x6';
 import type {Metadata as PortsMetadata, PortMetadata} from '@antv/x6/lib/model/port';
@@ -413,6 +413,7 @@ export class PlannerGraphService implements OnDestroy
 	private readonly warningOverListener: (e: MouseEvent) => void;
 	private readonly warningOutListener: (e: MouseEvent) => void;
 	private readonly tooltipDismissListener: () => void;
+	private readonly wheelGuardListener: (e: Event) => void;
 	/** Alt-tab loses hover state, so the anchor's mouseout may never fire. */
 	private tooltipAnchor: Element | null = null;
 	private registeredScale = 1;
@@ -477,11 +478,18 @@ export class PlannerGraphService implements OnDestroy
 		this.edgeHoverListener = e => this.onEdgeHoverMove(e);
 		this.warningOverListener = e => this.onWarningHover(e);
 		this.warningOutListener = e => this.onWarningOut(e);
-		this.tooltipDismissListener = () => {
+		// Firefox fires blur synchronously when rendering removes the focused element, where the signal write throws NG0600.
+		this.tooltipDismissListener = () => untracked(() => {
 			this.hideTooltip();
 			// x6 swallows mouseleave mid-press. Taps excepted: lifting the finger ends the synthetic pointer and would drop the handles.
 			if (this.touchedEdgeId === null) {
 				this.endEdgeHover();
+			}
+		});
+		// x6 reads the pointer position off the legacy wheel events and throws on synthetic ones that carry none.
+		this.wheelGuardListener = e => {
+			if (typeof (e as MouseEvent).clientX !== 'number') {
+				e.stopPropagation();
 			}
 		};
 		// Same quiet gap as the debounced save.
@@ -535,14 +543,14 @@ export class PlannerGraphService implements OnDestroy
 			id: 'root',
 			layoutOptions: {
 				'elk.algorithm': 'layered',
-				'elk.direction': settings.direction === 'down' ? 'DOWN' : 'RIGHT',
+				'elk.direction': ({left: 'RIGHT', down: 'DOWN', right: 'LEFT', up: 'UP'} as const)[settings.direction] ?? 'RIGHT',
 				'elk.edgeRouting': 'POLYLINE',
 				'elk.spacing.edgeLabel': '10',
 				'elk.spacing.nodeNode': String(settings.nodeSpacing),
 				'elk.layered.spacing.nodeNodeBetweenLayers': String(settings.layerSpacing),
 				'elk.layered.spacing.edgeNodeBetweenLayers': '4',
 				// The polyline router widens each gap in proportion to this, times how far lines travel sideways; top-to-bottom graphs are wide.
-				'elk.layered.spacing.edgeEdgeBetweenLayers': settings.direction === 'down' ? '2' : '4',
+				'elk.layered.spacing.edgeEdgeBetweenLayers': settings.direction === 'down' || settings.direction === 'up' ? '2' : '4',
 			},
 			children: nodes.map(node => ({
 				id: node.id,
@@ -590,7 +598,13 @@ export class PlannerGraphService implements OnDestroy
 		this.parallelOffsets = this.computeParallelOffsets(graph);
 
 		graph.nodes.forEach(node => this.addNode(x6Graph, node));
-		graph.edges.forEach((edge, i) => this.addEdge(x6Graph, edge, i));
+		// A saved edge whose node is gone would make x6 throw in its async render.
+		const nodeIds = new Set(graph.nodes.map(node => node.id));
+		graph.edges.forEach((edge, i) => {
+			if (nodeIds.has(edge.sourceId) && nodeIds.has(edge.targetId)) {
+				this.addEdge(x6Graph, edge, i);
+			}
+		});
 		this.warningEntriesSignal.set(this.buildWarningEntries(graph));
 
 		if (previous) {
@@ -618,6 +632,8 @@ export class PlannerGraphService implements OnDestroy
 		this.hoverMoveTarget?.removeEventListener('mouseover', this.warningOverListener);
 		this.hoverMoveTarget?.removeEventListener('mouseout', this.warningOutListener);
 		this.hoverMoveTarget?.removeEventListener('mouseleave', this.tooltipDismissListener);
+		this.hoverMoveTarget?.removeEventListener('mousewheel', this.wheelGuardListener, true);
+		this.hoverMoveTarget?.removeEventListener('DOMMouseScroll', this.wheelGuardListener, true);
 		window.removeEventListener('blur', this.tooltipDismissListener);
 		this.hoverMoveTarget = null;
 		this.x6Graph?.dispose();
@@ -1009,11 +1025,15 @@ export class PlannerGraphService implements OnDestroy
 		this.hoverMoveTarget?.removeEventListener('mouseover', this.warningOverListener);
 		this.hoverMoveTarget?.removeEventListener('mouseout', this.warningOutListener);
 		this.hoverMoveTarget?.removeEventListener('mouseleave', this.tooltipDismissListener);
+		this.hoverMoveTarget?.removeEventListener('mousewheel', this.wheelGuardListener, true);
+		this.hoverMoveTarget?.removeEventListener('DOMMouseScroll', this.wheelGuardListener, true);
 		window.removeEventListener('blur', this.tooltipDismissListener);
 		container.addEventListener('mousemove', this.edgeHoverListener);
 		container.addEventListener('mouseover', this.warningOverListener);
 		container.addEventListener('mouseout', this.warningOutListener);
 		container.addEventListener('mouseleave', this.tooltipDismissListener);
+		container.addEventListener('mousewheel', this.wheelGuardListener, true);
+		container.addEventListener('DOMMouseScroll', this.wheelGuardListener, true);
 		window.addEventListener('blur', this.tooltipDismissListener);
 		this.hoverMoveTarget = container;
 
@@ -1249,7 +1269,7 @@ export class PlannerGraphService implements OnDestroy
 		if (this.readOnly) {
 			return {};
 		}
-		const vertical = this.graphLayout.resolve(this.planManager.activePlan()?.settings.graph).direction === 'down';
+		const direction = this.graphLayout.resolve(this.planManager.activePlan()?.settings.graph).direction;
 		const markup = [
 			{tagName: 'circle', selector: 'portBody'},
 			{tagName: 'image', selector: 'portIcon'},
@@ -1274,8 +1294,8 @@ export class PlannerGraphService implements OnDestroy
 		};
 		return {
 			groups: {
-				in: {position: vertical ? 'top' : 'left', markup, attrs},
-				out: {position: vertical ? 'bottom' : 'right', markup, attrs},
+				in: {position: ({left: 'left', down: 'top', right: 'right', up: 'bottom'} as const)[direction] ?? 'left', markup, attrs},
+				out: {position: ({left: 'right', down: 'bottom', right: 'left', up: 'top'} as const)[direction] ?? 'right', markup, attrs},
 			},
 			items: [
 				...this.portItemsFor(node.inputs, 'in'),
@@ -1379,8 +1399,8 @@ export class PlannerGraphService implements OnDestroy
 			const ios = wantedSide === 'in' ? node.inputs : node.outputs;
 			const accepts = ios.some(io => io.item.className === gesture.itemClassName)
 				&& !this.hasEdgeBetween(id, gesture);
-			if (accepts) {
-				const portId = `${wantedSide}|${gesture.itemClassName}`;
+			const portId = `${wantedSide}|${gesture.itemClassName}`;
+			if (accepts && cell.hasPort(portId)) {
 				cell.portProp(portId, 'attrs/portBody/class', 'pg-port pg-port-available');
 				cell.portProp(portId, 'attrs/portIcon/class', 'pg-port pg-port-icon pg-port-available');
 				this.markedPorts.push({cell, portId});
@@ -1397,6 +1417,10 @@ export class PlannerGraphService implements OnDestroy
 		this.hideCornerPreview();
 		x6Graph.container.classList.remove('pg-connecting');
 		this.markedPorts.forEach(({cell, portId}) => {
+			// A recalculation or sync can redraw the node mid-drag and drop the port.
+			if (!cell.hasPort(portId)) {
+				return;
+			}
 			cell.portProp(portId, 'attrs/portBody/class', 'pg-port');
 			cell.portProp(portId, 'attrs/portIcon/class', 'pg-port pg-port-icon');
 		});

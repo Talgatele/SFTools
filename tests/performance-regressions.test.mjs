@@ -1,4 +1,5 @@
 import {test} from 'node:test';
+import {TextMatcher} from '../src/app/Model/Search/TextMatcher.ts';
 import assert from 'node:assert/strict';
 import {graphFixture, precisionFunctions} from './performance-fixtures.mjs';
 import {GraphEdgeBuilder} from '../src/app/Model/Planner/Graph/GraphEdgeBuilder.ts';
@@ -91,7 +92,7 @@ test('recipe tab caches derived state, invalidates on signals and copies selecti
 		{activeSettings: settings, updateActiveSettings: value => settings.set(value)},
 		{activeVersionData: data},
 		{resolve: current => { resolutions++; return new Set(current.enabledRecipes); }},
-		{}, {}, new CollapsedSectionsService(),
+		{}, {}, new TextMatcher(), new CollapsedSectionsService(),
 	);
 	for (let i = 0; i < 100; i++) {
 		assert.equal(component.isEnabled(recipes[0]), true);

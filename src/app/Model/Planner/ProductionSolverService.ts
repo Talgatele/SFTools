@@ -1,5 +1,5 @@
 import {Injectable} from '@angular/core';
-import {firstValueFrom, map, Observable, of} from 'rxjs';
+import {catchError, firstValueFrom, map, Observable, of} from 'rxjs';
 import {Data} from '@src/Model/Data/Data';
 import {Recipe} from '@src/Model/Data/Entities/Recipe';
 import {VersionManager} from '@src/Model/Data/VersionManager';
@@ -14,6 +14,7 @@ import {OptimisationTarget} from '@src/Model/Planner/Solver/Request/Optimisation
 import {GeneratorNode} from '@src/Model/Planner/Solver/Response/GeneratorNode';
 import {GroupingMode} from '@src/Model/Planner/GroupingMode';
 import {HighsSolution} from '@src/Model/Planner/Solver/HighsSolution';
+import {MachineWeight} from '@src/Model/Planner/MachineWeight';
 import {MachineGroupNormalizer} from '@src/Model/Planner/MachineGroupNormalizer';
 import {Plan} from '@src/Model/Planner/Plan';
 import {SloopAccuracy} from '@src/Model/Planner/SloopAccuracy';
@@ -43,6 +44,7 @@ import {SinkNode} from '@src/Model/Planner/Solver/Response/SinkNode';
 import {SubplanNode} from '@src/Model/Planner/Solver/Response/SubplanNode';
 import {preferSpaceElevatorRecipes, satisfactoryRecipeRate, satisfactoryTargets} from '@src/Model/Planner/SatisfactoryTargets';
 import {SatisfactoryFactoryRefinement} from '@src/Model/Planner/SatisfactoryFactoryRefinement';
+import {SolveSettingsError} from '@src/Model/Planner/Solver/SolveSettingsError';
 
 @Injectable({providedIn: 'root'})
 export class ProductionSolverService
@@ -81,7 +83,7 @@ export class ProductionSolverService
 		const extra = this.extraPower.resolve(plan.settings);
 		const sloopBudget = this.sloopBudgetOf(plan);
 		if (extra.sloopCost > sloopBudget) {
-			throw new Error(`The ${extra.augmenters.count} alien power augmenters cost ${extra.sloopCost} somersloops, `
+			throw new SolveSettingsError(`The ${extra.augmenters.count} alien power augmenters cost ${extra.sloopCost} somersloops, `
 				+ `but the plan only has ${sloopBudget}. `
 				+ 'Raise the budget in the Sloops tab or build fewer augmenters in the Power tab.');
 		}
@@ -90,8 +92,8 @@ export class ProductionSolverService
 		const request = this.buildRequest(plan, data, optimisation);
 		// Weighted inputs count as a goal of their own, as long as at least one is priced.
 		const weightedInputs = optimisation.inputs && request.inputs.some(input => input.weight > 0);
-		if (Object.keys(optimisation.rawResources).length === 0 && optimisation.power <= 0 && optimisation.machines <= 0 && !weightedInputs) {
-			throw new Error('No goal is enabled. Enable at least one in the Optimisation tab.');
+		if (Object.keys(optimisation.rawResources).length === 0 && optimisation.power <= 0 && !this.hasMachineGoal(optimisation) && !weightedInputs) {
+			throw new SolveSettingsError('No goal is enabled. Enable at least one in the Optimisation tab.');
 		}
 		const maximise = this.maximiseTarget(plan, data);
 		if (maximise !== null) {
@@ -119,6 +121,7 @@ export class ProductionSolverService
 				.filter(request => (request.mode ?? 'rate') === 'rate')
 				.filter(request => request.itemClassName !== SpecialClasses.PowerTarget
 					&& request.itemClassName !== SpecialClasses.SinkPointsTarget)
+				.filter(request => Number.isFinite(request.ratePerMinute))
 				.map(request => {
 					return {
 						item: data.getItemByClassName(request.itemClassName) as Item,
@@ -168,7 +171,7 @@ export class ProductionSolverService
 		}
 		const categories = new Set<MaximiseCategory>(rows.map(row => this.categoryOf(row.itemClassName)));
 		if (categories.size > 1) {
-			throw new Error('Only one kind of target (items, power or sink points) can be maximised at a time.');
+			throw new SolveSettingsError('Only one kind of target (items, power or sink points) can be maximised at a time.');
 		}
 		const category = [...categories][0];
 		const items = category !== 'items' ? [] : [...new Set(rows.map(row => row.itemClassName))]
@@ -253,6 +256,8 @@ export class ProductionSolverService
 						: `No solution: not enough shared raw resources are left in folder ${poolFolder}. `
 							+ 'Raise the folder limits or make the other plans smaller.';
 				}),
+				// The re-solve is only a hint: a timeout (somersloop MIPs can run for an hour) must not surface as an error.
+				catchError(() => of(generic)),
 			);
 		}
 
@@ -339,8 +344,31 @@ export class ProductionSolverService
 			rawResources,
 			power: powerEnabled ? settings?.powerWeight ?? OptimisationDefaults.powerWeight : 0,
 			machines: machinesEnabled ? settings?.machinesWeight ?? OptimisationDefaults.machinesWeight : 0,
+			machineWeights: machinesEnabled ? this.machineWeightOverrides(settings?.machineWeights ?? []) : {},
+			wholeMachines: (settings?.machineCounting ?? 'fractional') === 'whole',
 			inputs: settings?.inputs ?? true,
 		};
+	}
+
+	private machineWeightOverrides(entries: MachineWeight[]): Record<string, number>
+	{
+		const weights: Record<string, number> = {};
+		for (const entry of entries) {
+			if (entry.machineClassName !== '' && isFinite(entry.weight) && entry.weight >= 0) {
+				weights[entry.machineClassName] = entry.weight;
+			}
+		}
+		return weights;
+	}
+
+	private machineWeightFor(optimisation: OptimisationTarget, machine: Building): number
+	{
+		return optimisation.machineWeights[machine.className] ?? optimisation.machines;
+	}
+
+	private hasMachineGoal(optimisation: OptimisationTarget): boolean
+	{
+		return optimisation.machines > 0 || Object.values(optimisation.machineWeights).some(weight => weight > 0);
 	}
 
 	/** Augmenters are constants in the LP, not a column, so their node is restated from the settings after every solve. */
@@ -492,6 +520,8 @@ export class ProductionSolverService
 	private buildLp(request: SolverRequest, data: Data, lockedNodes: Node[] = [], refinement?: SatisfactoryFactoryRefinement): string
 	{
 		const lines: string[] = ['\\\\ Production Plan', 'Minimize'];
+		// Integer "_count >= column" companions, shared by somersloops and whole-machine counting.
+		const countedColumns = new Set<string>();
 
 		if (refinement) {
 			lines.push(refinement.objective);
@@ -516,23 +546,40 @@ export class ProductionSolverService
 				});
 			}
 
-			if (request.optimisation.power > 0 || request.optimisation.machines > 0) {
+			if (request.optimisation.power > 0 || this.hasMachineGoal(request.optimisation)) {
+				const whole = request.optimisation.wholeMachines;
 				request.recipes.forEach(recipe => {
 					recipe.producedIn.forEach(machine => {
 						const clockSpeed = this.clockFor(request, recipe, machine);
+						const machineWeight = this.machineWeightFor(request.optimisation, machine);
 						for (let sloops = 0; sloops <= Math.min(request.maxSloops, machine.sloopSlots); sloops++) {
-							const cost = request.optimisation.power * Formulas.machinePowerUsage(recipe, machine, clockSpeed, sloops)
-								+ request.optimisation.machines;
-							if (cost > 0) {
-								optimisation.push(cost + ' ' + recipe.className + '@' + machine.className + '%' + clockSpeed + '#' + sloops);
+							const column = recipe.className + '@' + machine.className + '%' + clockSpeed + '#' + sloops;
+							const power = request.optimisation.power * Formulas.machinePowerUsage(recipe, machine, clockSpeed, sloops);
+							if (whole && machineWeight > 0) {
+								countedColumns.add(column);
+								if (power > 0) {
+									optimisation.push(power + ' ' + column);
+								}
+								optimisation.push(machineWeight + ' ' + column + '_count');
+							} else if (power + machineWeight > 0) {
+								optimisation.push((power + machineWeight) + ' ' + column);
 							}
 						}
 					});
 				});
-				if (request.optimisation.machines > 0) {
-					request.generators.forEach(option =>
-						optimisation.push(request.optimisation.machines + ' ' + this.generatorVariableName(option)));
-				}
+				request.generators.forEach(option => {
+					const machineWeight = this.machineWeightFor(request.optimisation, option.generator);
+					if (machineWeight <= 0) {
+						return;
+					}
+					const column = this.generatorVariableName(option);
+					if (whole) {
+						countedColumns.add(column);
+						optimisation.push(machineWeight + ' ' + column + '_count');
+					} else {
+						optimisation.push(machineWeight + ' ' + column);
+					}
+				});
 			}
 
 			lines.push(optimisation.join('\n+ '));
@@ -732,11 +779,13 @@ export class ProductionSolverService
 			lines.push(' = ' + request.sinkPointsDemand);
 		}
 
+		sloopedRecipes.forEach((sloops, recipe) => countedColumns.add(recipe));
+		countedColumns.forEach(column => lines.push(column + '_count - ' + column + ' >= 0'));
+
 		if (request.maxSloops > 0) {
 			const sloopLines: string[] = [];
 
 			sloopedRecipes.forEach((sloops, recipe) => {
-				lines.push(recipe + '_count - ' + recipe + ' >= 0');
 				sloopLines.push(sloops + ' ' + recipe + '_count');
 			});
 
@@ -786,10 +835,10 @@ export class ProductionSolverService
 			lines.push(this.lockedVariableName(node) + ' = 1');
 		});
 
-		if (sloopedRecipes.size || refinement?.generals.length) {
+		if (countedColumns.size || refinement?.generals.length) {
 			lines.push('\nGeneral');
-			sloopedRecipes.forEach((value, key) => {
-				lines.push(key + '_count');
+			countedColumns.forEach(column => {
+				lines.push(column + '_count');
 			});
 			lines.push(...refinement?.generals ?? []);
 		}
@@ -1043,7 +1092,7 @@ export class ProductionSolverService
 			if (maxStatus === 'Unbounded') {
 				// Input-free recipes (e.g. the FICSMAS Gift Tree) make their products limitless whatever the resource limits are.
 				const free = roundBase.recipes.filter(recipe => recipe.ingredients.length === 0 && recipe.producedIn.length > 0);
-				throw new Error(free.length > 0
+				throw new SolveSettingsError(free.length > 0
 					? `There is no limit to how much can be made, because ${free.map(recipe => recipe.name).join(', ')} needs no inputs. Turn it off in the Recipes tab.`
 					: 'There is no limit to how much can be made. Set raw resource limits in the Resources tab.');
 			}

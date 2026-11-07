@@ -9,6 +9,7 @@ import {HelpArticleGroup} from '@src/Components/Help/HelpArticleGroup';
 import {HelpLinkDirective} from '@src/Components/Help/HelpLinkDirective';
 import {HelpNavigation} from '@src/Components/Help/HelpNavigation';
 import {HelpManager} from '@src/Model/Help/HelpManager';
+import {TextMatcher} from '@src/Model/Search/TextMatcher';
 
 @Component({
 	selector: 'help-browser',
@@ -215,6 +216,7 @@ export class HelpBrowserComponent
 		public readonly help: HelpManager,
 		private readonly navigation: HelpNavigation,
 		private readonly host: ElementRef<HTMLElement>,
+		private readonly matcher: TextMatcher,
 	)
 	{
 		// In a panel the reader swaps content inside one scroll container, which would keep its offset; the fullscreen page scrolls the window, which the router's scroll restoration resets.
@@ -260,8 +262,8 @@ export class HelpBrowserComponent
 			return true;
 		}
 		const article = this.help.articles()[slug];
-		return [article.title, article.summary, ...article.keywords]
-			.some(text => text.toLowerCase().includes(query));
+		return this.matcher.matches(query, article.title, article.summary)
+			|| article.keywords.some(keyword => this.matcher.matches(query, keyword));
 	}
 
 	private scrollNavToCurrent(): void

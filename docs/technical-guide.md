@@ -1,6 +1,6 @@
 # Satisfactory Tools: technical and agent guide
 
-Repository reference for humans and coding agents. Reviewed against the working tree on 23 October 2026. Paths below are relative to the repository root. The source and configuration take precedence when they change; dependency versions below are declared ranges, not a guarantee of the installed version.
+Repository reference for humans and coding agents. Updated for the upstream integration on 7 November 2026. Paths below are relative to the repository root. The source and configuration take precedence when they change; dependency versions below are declared ranges, not a guarantee of the installed version.
 
 ## 1. Project scope and boundaries
 
@@ -18,6 +18,7 @@ The upstream account system remains disabled: `Model/Auth/AuthService.ts` report
 | Language | TypeScript `~6.0.3`, strict mode, ES2022 target/module, bundler module resolution |
 | UI | Bootstrap `^5.3.8`, ngx-bootstrap `^22.0.0`, Font Awesome 7, Lato fonts, SCSS |
 | Interactive graph | AntV X6 `^3.1.7`; ELK `^0.11.1` layered layout is used by `PlannerGraphService` |
+| World map | Leaflet `^1.9.4`, loaded on demand; tiles, resource nodes and collectibles come from version metadata/API assets |
 | Optimisation | HiGHS `^1.14.2`, JavaScript/WASM in a module Web Worker; LP and mixed-integer options |
 | Save parsing | `@etothepii/satisfactory-file-parser` `^4.1.1`, in a separate module worker |
 | Markdown | `marked` `^18.0.13`, DOMPurify `^3.4.17` |
@@ -83,6 +84,7 @@ All entries in this table are under `src/app/` unless otherwise stated.
 | `Model/Planner/Breakdown/`, `Pool/` | Production/power/build-cost summaries and shared resource limits |
 | `Model/API/`, `Model/API/Schema/` | HTTP clients and wire contracts, including data, plans, shares, versions, mods and help |
 | `Model/Data/` | Version selection/loading, schema transformation, hydrated entities, indexes, icons and world limits |
+| `Components/Map/`, `Model/Map/`, `Model/Game/` | Fullscreen/planner maps, resource areas, factory sites, map export, and imported game state |
 | `Model/Storage/`, `Model/Sync/` | Storage adapter, local/API data backends, persistence and conflict-resolution abstractions |
 | `Model/Settings/`, `Components/Settings/` | Defaults, normalization, settings state, settings UI and conflict machinery |
 | `Model/Hotkeys/` | Action catalog, registrations, binding overrides, formatting and dispatch |
@@ -113,6 +115,7 @@ All entries in this table are under `src/app/` unless otherwise stated.
 | File tools | `.sft` plan export/import, legacy imports, cross-version conversion, SVG/PNG graph export |
 | Save unlock import | Read a game save to map unlocked content into calculator settings; this is distinct from exporting/editing game saves |
 | Game reference | `/:versionSlug/codex` and nested paths, items/recipes/buildings/schematics |
+| World map | `/:versionSlug/map` and the floating planner Map panel; resource areas can set plan limits, with factory location viability and save-derived markers |
 | Custom data | `/create-version`, `/mods`, `/mods/:modId`, `/mods/:modId/versions/:modVersionId/data`, `/mod-editor` |
 | Help | `/help` and `/help/:slug`; help also appears inside planner panels |
 | Settings/about | `/settings`, `/settings/:section`, `/about` |
@@ -126,9 +129,11 @@ The Request tab guide (`tab-request`) is bundled in `src/assets/help/tab-request
 
 ### Startup and game data
 
-`main.ts` bootstraps `RootComponent` using `config.ts`, registers `BrowserAppStorage`, and raises `sftools:boot-failed` if bootstrap fails. `index.html` handles the boot failure screen. Configuration registers fetch-based Angular HTTP, retry/connectivity/API-call-log interceptors, the error handler and title strategy.
+`main.ts` bootstraps `RootComponent` using `config.ts`, registers `BrowserAppStorage`, and raises `sftools:boot-failed` if bootstrap fails. `index.html` loads `boot-fallback.js` for the boot failure screen; Angular copies this external script as an asset so it works under the upstream Content Security Policy. Configuration registers fetch-based Angular HTTP, retry/connectivity/API-call-log interceptors, the error handler and title strategy.
 
 The root route resolves versions and settings. `ApiService` loads `/v1/versions` and a selected version's `dataPath`. `VersionDataResolver` selects the version from the slug; `VersionManager` manages active version/data, local custom versions, reconnect reloads and one-time stale data-path recovery. `DataTransformer` and `Data` turn wire schemas into entities and lookup indexes.
+
+`VersionFileCaching` revalidates official version files, which upstream rewrites in place; content-addressed custom version files keep normal caching. Optional metadata supplies map IDs, world-node paths and collectible paths. Versions without map data retain the upstream missing-map behavior.
 
 Use game `className` identifiers for entity references; display names are not stable keys. Keep API schemas distinct from hydrated entities. Obtain recipes, buildings, items and limits through active-version data instead of assuming one global game release or hard-coding recipe availability.
 
@@ -146,6 +151,7 @@ Solver implementation details that matter:
 - `SolverService` has a 90-second default timeout. Unsubscribing from a pending solve terminates/replaces the worker because HiGHS runs synchronously within it. Preserve cancellation and request-ID behavior.
 - `SolverWorker.ts` fetches `/assets/highs.js`, patches its output precision, imports it through a Blob URL, and locates WASM under `/assets`. `angular.json` copies both files from `node_modules/highs/build`.
 - The precision patch depends on exact upstream source anchors. A HiGHS upgrade must check those anchors and large-flow balance; otherwise output can fall back to six significant digits and create false shortages.
+- Optimisation supports per-building/generator machine weights and fractional or whole-machine counting. Whole counting shares integer count columns with somersloops; preserve the separate Satisfactory refinement constraints and integer/binary declarations. `SolveSettingsError` identifies actionable configuration problems separately from solver failures.
 - Current options include a default mixed-integer relative gap of 0.05, overridable by worker options. Numerical tolerances, integer choices and display rounding are different concerns; changing one can alter feasibility or runtime.
 - Assets are resolved from the origin root. Subpath hosting or restrictive CSP can break worker startup even when Angular itself loads; verify fetch, Blob module import and WASM delivery.
 
@@ -160,9 +166,12 @@ Solver implementation details that matter:
 | `sftools.settings` | Settings, including graph/planner defaults, hotkeys and panels |
 | `sftools.lastPlanner` | Remembered planner location |
 | `sftools.customVersions` | Shared custom-version IDs |
+| `sftools.games` | Browser-local imported map games and marker overrides; upstream account sync remains disabled in this fork |
 | `sftools.serverLibrary.journal` | Browser-local unsaved draft values and base revisions; never a password/session token |
 
 Plan keys and custom-version references are server-backed in Docker; UI keys remain per-browser. This is not an exhaustive list of UI storage keys. Use `AppStorage` rather than adding direct browser-storage access to domain services. Browser migration is scoped to the origin, while the authenticated server library is shared across devices. Use exports or a disposable library when exercising destructive storage behavior. Server saves use compare-and-swap revisions; stale edits remain drafts until explicitly recovered as a copy.
+
+The November upstream merge also adds node type conversion and subplan inlining, retaining graph history and read-only guards. Map placement/resource-area settings are part of plan settings and therefore use the existing shared plan persistence. Imported map games remain local. See [upstream integration notes](upstream-merge-2026-11-07.md) for merge decisions and validation.
 
 Plans include identity, folder/parent-plan references, settings, requests, inputs, optional graph, metadata and revision. Existing persisted plans may lack newer fields. Update normalization/defaults and serializers alongside type changes; a TypeScript interface alone does not migrate stored JSON. Relevant boundaries include `LocalPlanStoreBackend`, `PlanSettingsNormalizer`, `SettingsDefaults`, `PlanSerializer` and `PlanDataSerializer`.
 

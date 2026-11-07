@@ -1,7 +1,7 @@
 import {AfterViewInit, Component, computed, effect, ElementRef, OnDestroy, signal, untracked, ViewChild, ChangeDetectionStrategy} from '@angular/core';
 import {toObservable} from '@angular/core/rxjs-interop';
 import {ActivatedRoute, Router} from '@angular/router';
-import {faBolt, faBook, faChartPie, faCircleQuestion, faCoins, faCrosshairs, faCubes, faFolderTree, faGear, faListCheck} from '@fortawesome/free-solid-svg-icons';
+import {faBolt, faBook, faChartPie, faCircleQuestion, faCoins, faCrosshairs, faCubes, faFolderTree, faGear, faListCheck, faMap} from '@fortawesome/free-solid-svg-icons';
 import {combineLatest, debounceTime, distinctUntilChanged, filter, finalize, pairwise, skip, Subscription} from 'rxjs';
 import {CodexNavigation} from '@src/Components/Codex/CodexNavigation';
 import {PanelCodexNavigation} from '@src/Components/Codex/PanelCodexNavigation';
@@ -46,6 +46,9 @@ import {PanelLayoutService} from '@src/Components/Planner/Panel/PanelLayoutServi
 import {CalculatorComponent} from '@src/Components/Planner/Panels/Calculator/CalculatorComponent';
 import {PlannerCodexComponent} from '@src/Components/Planner/Panels/Codex/PlannerCodexComponent';
 import {PlannerHelpComponent} from '@src/Components/Planner/Panels/Help/PlannerHelpComponent';
+import {PlannerMapComponent} from '@src/Components/Planner/Panels/Map/PlannerMapComponent';
+import {MapPanelRequests} from '@src/Components/Map/MapPanelRequests';
+import {PanelMapLocation} from '@src/Components/Map/PanelMapLocation';
 import {PlannerBuildCostComponent} from '@src/Components/Planner/Panels/BuildCost/PlannerBuildCostComponent';
 import {PlannerInspectorComponent} from '@src/Components/Planner/Panels/Inspector/PlannerInspectorComponent';
 import {PlannerItemsComponent} from '@src/Components/Planner/Panels/Items/PlannerItemsComponent';
@@ -67,10 +70,12 @@ import {GraphEdge} from '@src/Model/Planner/Graph/GraphEdge';
 import {GraphLayoutResolver} from '@src/Model/Planner/GraphLayoutResolver';
 import {GroupingModeResolver} from '@src/Model/Planner/GroupingModeResolver';
 import {GraphPoint} from '@src/Model/Planner/Graph/GraphPoint';
+import {GraphDirection} from '@src/Model/Planner/GraphDirection';
 import {GraphSnapshot} from '@src/Model/Planner/Graph/GraphSnapshot';
 import {GraphEdgeBuilder} from '@src/Model/Planner/Graph/GraphEdgeBuilder';
 import {GraphReconciler} from '@src/Model/Planner/Graph/GraphReconciler';
 import {NodeResizer} from '@src/Model/Planner/NodeResizer';
+import {NodeTypeConverter} from '@src/Model/Planner/NodeTypeConverter';
 import {NodeSplitter} from '@src/Model/Planner/NodeSplitter';
 import {ByproductNode} from '@src/Model/Planner/Solver/Response/ByproductNode';
 import {InputNode} from '@src/Model/Planner/Solver/Response/InputNode';
@@ -85,6 +90,8 @@ import {PlanManager} from '@src/Model/Planner/PlanManager';
 import {PlannerLocationService} from '@src/Model/Planner/PlannerLocationService';
 import {PlanSerializer} from '@src/Model/Planner/PlanSerializer';
 import {SubplanIOResolver} from '@src/Model/Planner/SubplanIOResolver';
+import {SubplanInliner} from '@src/Model/Planner/SubplanInliner';
+import {SubplanInlineResult} from '@src/Model/Planner/SubplanInlineResult';
 import {SubplanScaler} from '@src/Model/Planner/SubplanScaler';
 import {NotificationService} from '@src/Model/NotificationService';
 import {ProductionSolverService} from '@src/Model/Planner/ProductionSolverService';
@@ -103,6 +110,7 @@ import {PlanExportDialogComponent} from '@src/Components/Planner/PlanFiles/PlanE
 import {PlanImportDialogComponent} from '@src/Components/Planner/PlanFiles/PlanImportDialogComponent';
 import {PlanFileDialogService} from '@src/Model/PlanFiles/PlanFileDialogService';
 import {GraphExportDialogService} from '@src/Components/Planner/Export/GraphExportDialogService';
+import {SolveSettingsError} from '@src/Model/Planner/Solver/SolveSettingsError';
 
 // Matches the reconciler's absolute warning tolerance.
 const FLOW_TOLERANCE = 0.001;
@@ -123,9 +131,11 @@ const RATIO_TOLERANCE = 1e-4;
 		PlannerNodeTooltipService,
 		GraphHistoryService,
 		{provide: CodexNavigation, useClass: PanelCodexNavigation},
+		// Lets the calculator ask the map panel to draw or show something.
+		MapPanelRequests,
 	],
 	changeDetection: ChangeDetectionStrategy.Eager,
-	host: {style: 'position: fixed; top: 40px; left: 0; right: 0; bottom: 0; overflow: hidden;'},
+	host: {style: 'position: fixed; top: var(--navbar-height, 40px); left: 0; right: 0; bottom: 0; overflow: hidden;'},
 })
 export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSource
 {
@@ -168,6 +178,7 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 		private readonly graphReconciler: GraphReconciler,
 		private readonly nodeResizer: NodeResizer,
 		private readonly nodeSplitter: NodeSplitter,
+		private readonly nodeTypeConverter: NodeTypeConverter,
 		private readonly edgeBuilder: GraphEdgeBuilder,
 		private readonly plannerGraph: PlannerGraphService,
 		public readonly panelLayout: PanelLayoutService,
@@ -182,6 +193,7 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 		private readonly groupingModes: GroupingModeResolver,
 		private readonly subplanResolver: SubplanIOResolver,
 		private readonly subplanScaler: SubplanScaler,
+		private readonly subplanInliner: SubplanInliner,
 		private readonly notifications: NotificationService,
 		private readonly rateFormatter: RateFormatter,
 		private readonly settings: SettingsManager,
@@ -302,6 +314,19 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 			defaultFloatHeight: 400,
 		});
 
+		panelLayout.register({
+			id: 'map',
+			helpTopic: 'panel.map',
+			hotkey: 'panel.map',
+			label: 'Map',
+			icon: faMap,
+			component: PlannerMapComponent,
+			defaultSide: 'right',
+			defaultFloating: true,
+			defaultFloatWidth: 640,
+			defaultFloatHeight: 480,
+		});
+
 		panelLayout.applyLayout(this.settings.panels());
 
 		// Restored panel layouts may leave the calculator closed. Selecting a plan should always bring its contents into view.
@@ -327,6 +352,9 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 		}
 		if (this.route.snapshot.queryParamMap.has('help')) {
 			panelLayout.focusPanel('help');
+		}
+		if (Object.values(PanelMapLocation.PARAMS).some(param => this.route.snapshot.queryParamMap.has(param))) {
+			panelLayout.focusPanel('map');
 		}
 
 		// Old share links carry the key to import. The plans panel owns the dialog, so the request is parked for it; the params leave the URL so a reload or copied link does not import the line again.
@@ -439,6 +467,10 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 
 		this.subscription.add(
 			this.actions.subplanOpenRequests.subscribe(subplanId => this.openSubplan(subplanId)),
+		);
+
+		this.subscription.add(
+			this.actions.subplanUnpackRequests.subscribe(nodeId => this.unpackSubplan(nodeId)),
 		);
 
 		this.subscription.add(
@@ -574,13 +606,18 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 				}),
 		);
 
-		for (const panel of ['codex', 'help']) {
+		const panelParams: Record<string, string[]> = {
+			codex: ['codex'],
+			help: ['help'],
+			map: Object.values(PanelMapLocation.PARAMS),
+		};
+		for (const [panel, params] of Object.entries(panelParams)) {
 			this.subscription.add(
 				toObservable(computed(() => this.panelLayout.isOpen(panel))).pipe(skip(1)).subscribe(open => {
-					if (!open && this.route.snapshot.queryParamMap.has(panel)) {
+					if (!open && params.some(param => this.route.snapshot.queryParamMap.has(param))) {
 						void this.router.navigate([], {
 							relativeTo: this.route,
-							queryParams: {[panel]: null},
+							queryParams: Object.fromEntries(params.map(param => [param, null])),
 							queryParamsHandling: 'merge',
 						});
 					}
@@ -613,6 +650,8 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 		// Also re-render when read-only state flips (moving a device plan into the account keeps it selected).
 		this.subscription.add(
 			toObservable(this.planManager.activePlan).pipe(skip(1)).subscribe(plan => {
+				// A plan picked before the view exists is rendered by ngAfterViewInit.
+				if (!this.graphContainerRef) return;
 				if (plan?.id === this.renderedPlanId && (plan === null || this.planManager.isReadOnlyPlan(plan.id) === this.plannerGraph.readOnly)) return;
 				if (plan?.id !== this.renderedPlanId) {
 					this.cancelCalculation();
@@ -739,6 +778,7 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 		const nodes = this.plannerGraph.selectedNodes();
 		if (nodes.length === 1) {
 			items.push(...new NodeContextMenu(nodes[0], this.nodeResizeOptions(nodes[0]), this.nodeSplitOptions(nodes[0]),
+				this.nodeTypeConverter.converted(nodes[0], this.versionManager.activeVersionData()),
 				this.actions, this.panelLayout, this.plannerGraph).getItems());
 		} else if (nodes.length > 1) {
 			items.push(...new MultiNodeContextMenu(nodes, this.actions).getItems());
@@ -811,6 +851,7 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 			menu = new BlankContextMenu(this.actions, request.local, this.planManager.activePlan() !== null);
 		} else if (request.nodes.length === 1) {
 			menu = new NodeContextMenu(request.nodes[0], this.nodeResizeOptions(request.nodes[0]), this.nodeSplitOptions(request.nodes[0]),
+				this.nodeTypeConverter.converted(request.nodes[0], this.versionManager.activeVersionData()),
 				this.actions, this.panelLayout, this.plannerGraph);
 		} else {
 			menu = new MultiNodeContextMenu(request.nodes, this.actions);
@@ -923,7 +964,7 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 
 		const size = this.plannerGraph.nodeSize(node);
 		const layout = this.graphLayout.resolve(plan.settings.graph);
-		const offset: GraphPoint = layout.direction === 'down'
+		const offset: GraphPoint = this.isVertical(layout.direction)
 			? {x: size.width + layout.nodeSpacing, y: 0}
 			: {x: 0, y: size.height + layout.nodeSpacing};
 
@@ -1600,6 +1641,47 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 		}
 	}
 
+	private unpackSubplan(nodeId: string): void
+	{
+		if (this.planManager.activePlanReadOnly()) {
+			return;
+		}
+		const plan = this.planManager.activePlan();
+		if (!plan?.graph || plan.id !== this.renderedPlanId) {
+			return;
+		}
+
+		let graph: Graph;
+		try {
+			graph = this.planSerializer.reviveGraph(plan.graph);
+		} catch (err) {
+			this.notifications.show('Could not unpack subplan: ' + String(err));
+			return;
+		}
+		const node = graph.nodes.find(n => n.id === nodeId);
+		if (!(node instanceof SubplanNode)) {
+			return;
+		}
+		const subplan = this.planManager.findPlan(node.subplanId);
+		if (!subplan || subplan.parentPlanId !== plan.id) {
+			this.notifications.show('This subplan no longer exists.');
+			return;
+		}
+
+		let result: SubplanInlineResult;
+		try {
+			result = this.subplanInliner.inlined(graph, node, subplan);
+		} catch (err) {
+			this.notifications.show('Could not unpack subplan: ' + String(err));
+			return;
+		}
+
+		this.history.push(this.snapshotOf(plan));
+		this.planManager.dissolveSubplan(subplan.id, result.graph);
+		this.plannerGraph.restore(this.graphContainerRef.nativeElement, result.graph, false);
+		this.plannerGraph.selectNodesById(result.nodeIds);
+	}
+
 	public closeAddNode(): void
 	{
 		this.addNodePositionSignal.set(null);
@@ -1658,7 +1740,7 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 		this.history.push(this.snapshotOf(plan));
 
 		const origin = pending ? graph.nodes.find(candidate => candidate.id === pending.nodeId) ?? null : null;
-		this.placeAddedNode(node, position, origin, this.graphLayout.resolve(plan.settings.graph).direction === 'down');
+		this.placeAddedNode(node, position, origin, this.isVertical(this.graphLayout.resolve(plan.settings.graph).direction));
 
 		const updated: Graph = {nodes: [...graph.nodes, node], edges: [...graph.edges]};
 		const edge = pending ? this.connectingEdgeFor(updated, pending, node) : null;
@@ -1679,6 +1761,11 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 		this.planManager.setGraph(plan.id, {nodes: [node], edges: []}, true);
 		this.keepViewportForPlanId = plan.id;
 		this.planManager.setActivePlan(plan.id);
+	}
+
+	private isVertical(direction: GraphDirection): boolean
+	{
+		return direction === 'down' || direction === 'up';
 	}
 
 	/** For connect gestures the border facing the origin lands on the point, so the edge ends at the drop; plain adds center on it. */
@@ -2038,7 +2125,11 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 		try {
 			result$ = this.productionSolver.solve({...plan, requests: validRequests}, lockedNodes);
 		} catch (err) {
-			this.actions.setSolveError('error', 'Could not start the calculation: ' + String(err) + '. Please reload the page and try again.');
+			if (err instanceof SolveSettingsError) {
+				this.actions.setSettingsProblem(err);
+			} else {
+				this.actions.setSolveError('error', 'Could not start the calculation: ' + String(err) + '. Please reload the page and try again.');
+			}
 			return;
 		}
 
@@ -2068,6 +2159,10 @@ export class PlannerComponent implements AfterViewInit, OnDestroy, HotkeyItemSou
 			},
 			error: err => {
 				if (calculationGeneration !== this.calculationGeneration || this.planManager.activePlanId() !== plan.id) return;
+				if (err instanceof SolveSettingsError) {
+					this.actions.setSettingsProblem(err);
+					return;
+				}
 				console.error('Solver error:', err);
 				this.actions.setSolveError('error', 'Calculation failed: ' + String(err instanceof Error ? err.message : err));
 			},

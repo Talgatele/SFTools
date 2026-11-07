@@ -51,7 +51,7 @@ export class ResourcePoolService
 		const limits = folder.settings?.resourceLimits ?? {};
 		const disabled = new Set(folder.settings?.disabledResources ?? []);
 		const others = this.usageByOthers(folder, plan);
-		const own = this.usageOfPlan(plan);
+		const own = this.mineUsage(plan);
 
 		return data.resources
 			.map(className => data.searchItemByClassName(className))
@@ -77,7 +77,17 @@ export class ResourcePoolService
 	public usageInFolder(folderId: string): Map<string, number>
 	{
 		const total = new Map<string, number>();
-		this.planManager.innerPlans(folderId).forEach(plan => this.usageOfPlan(plan).forEach((amount, className) => {
+		this.planManager.innerPlans(folderId).forEach(plan => this.mineUsage(plan).forEach((amount, className) => {
+			total.set(className, (total.get(className) ?? 0) + amount);
+		}));
+		return total;
+	}
+
+	/** The plan's mining, its subplans' included. */
+	public usageOfPlan(plan: Plan): Map<string, number>
+	{
+		const total = new Map<string, number>();
+		[plan, ...this.planManager.subplansOf(plan.id)].forEach(entry => this.mineUsage(entry).forEach((amount, className) => {
 			total.set(className, (total.get(className) ?? 0) + amount);
 		}));
 		return total;
@@ -93,14 +103,14 @@ export class ResourcePoolService
 		const total = new Map<string, number>();
 		this.planManager.innerPlans(folder.id)
 			.filter(other => other.id !== plan.id)
-			.forEach(other => this.usageOfPlan(other).forEach((amount, className) => {
+			.forEach(other => this.mineUsage(other).forEach((amount, className) => {
 				total.set(className, (total.get(className) ?? 0) + amount);
 			}));
 		return total;
 	}
 
 	/** Stored graphs are revived node instances or raw JSON straight from storage, hence the duck typing. */
-	public usageOfPlan(plan: Plan): Map<string, number>
+	private mineUsage(plan: Plan): Map<string, number>
 	{
 		const builds = this.subplanBuildCounter.totalBuildsOf(plan);
 		const usage = new Map<string, number>();

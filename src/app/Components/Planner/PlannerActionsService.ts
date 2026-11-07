@@ -1,4 +1,4 @@
-import {Injectable, Signal, signal} from '@angular/core';
+import {Injectable, Signal, computed, signal} from '@angular/core';
 import {Observable, Subject} from 'rxjs';
 import {GraphConnectToBlankRequest} from '@src/Components/Planner/GraphConnectToBlankRequest';
 import {GraphEdgeAddRequest} from '@src/Components/Planner/GraphEdgeAddRequest';
@@ -12,11 +12,14 @@ import {SubplanScaleRequest} from '@src/Components/Planner/SubplanScaleRequest';
 import {GraphEdge} from '@src/Model/Planner/Graph/GraphEdge';
 import {GraphPoint} from '@src/Model/Planner/Graph/GraphPoint';
 import {Node} from '@src/Model/Planner/Solver/Response/Node';
+import {SolveSettingsError} from '@src/Model/Planner/Solver/SolveSettingsError';
 
 /** Panels are created via ngComponentOutlet and cannot use output bindings, so their actions reach PlannerComponent through here. */
 @Injectable()
 export class PlannerActionsService
 {
+
+	public static readonly SETTINGS_PROBLEM = 'check settings';
 
 	private readonly calculateSubject = new Subject<void>();
 	public readonly calculateRequests: Observable<void> = this.calculateSubject.asObservable();
@@ -62,6 +65,9 @@ export class PlannerActionsService
 
 	private readonly subplanConvertSubject = new Subject<string[]>();
 	public readonly subplanConvertRequests: Observable<string[]> = this.subplanConvertSubject.asObservable();
+
+	private readonly subplanUnpackSubject = new Subject<string>();
+	public readonly subplanUnpackRequests: Observable<string> = this.subplanUnpackSubject.asObservable();
 
 	private readonly subplanOpenSubject = new Subject<string>();
 	public readonly subplanOpenRequests: Observable<string> = this.subplanOpenSubject.asObservable();
@@ -110,6 +116,8 @@ export class PlannerActionsService
 
 	private readonly solveErrorDetailSignal = signal<string | null>(null);
 	public readonly solveErrorDetail: Signal<string | null> = this.solveErrorDetailSignal.asReadonly();
+
+	public readonly solveErrorIsSettingsProblem: Signal<boolean> = computed(() => this.solveErrorSignal() === PlannerActionsService.SETTINGS_PROBLEM);
 
 	public requestCalculate(): void
 	{
@@ -186,6 +194,11 @@ export class PlannerActionsService
 		this.subplanConvertSubject.next(nodeIds);
 	}
 
+	public requestSubplanUnpack(nodeId: string): void
+	{
+		this.subplanUnpackSubject.next(nodeId);
+	}
+
 	public requestSubplanOpen(subplanId: string): void
 	{
 		this.subplanOpenSubject.next(subplanId);
@@ -254,6 +267,11 @@ export class PlannerActionsService
 	public setCalculating(calculating: boolean): void
 	{
 		this.isCalculatingSignal.set(calculating);
+	}
+
+	public setSettingsProblem(error: SolveSettingsError): void
+	{
+		this.setSolveError(PlannerActionsService.SETTINGS_PROBLEM, error.message);
 	}
 
 	public setSolveError(message: string | null, detail: string | null = null): void

@@ -2,13 +2,14 @@ import {Component, ChangeDetectionStrategy, OnDestroy, signal, Signal, WritableS
 import {ActivatedRoute, Router} from '@angular/router';
 import {Subscription} from 'rxjs';
 import {FaIconComponent} from '@fortawesome/angular-fontawesome';
-import {faHashtag, faDiagramProject, faFileCirclePlus, faKeyboard, faRotateLeft, faTableColumns} from '@fortawesome/free-solid-svg-icons';
+import {faHashtag, faDiagramProject, faFileCirclePlus, faKeyboard, faMap, faRotateLeft, faTableColumns} from '@fortawesome/free-solid-svg-icons';
 import {BackLinkComponent} from '@src/Components/Common/BackLinkComponent';
 import {InfoNoteComponent} from '@src/Components/Common/InfoNoteComponent';
 import {SettingsGraphComponent} from '@src/Components/Settings/SettingsGraphComponent';
 import {SettingsHotkeysComponent} from '@src/Components/Settings/SettingsHotkeysComponent';
 import {SettingsNumbersComponent} from '@src/Components/Settings/SettingsNumbersComponent';
 import {SettingsPlanDefaultsComponent} from '@src/Components/Settings/SettingsPlanDefaultsComponent';
+import {SettingsMapComponent} from '@src/Components/Settings/SettingsMapComponent';
 import {SettingsPlannerComponent} from '@src/Components/Settings/SettingsPlannerComponent';
 import {SettingsSection} from '@src/Components/Settings/SettingsSection';
 import {SettingsManager} from '@src/Model/Settings/SettingsManager';
@@ -16,7 +17,7 @@ import {SettingsManager} from '@src/Model/Settings/SettingsManager';
 @Component({
 	templateUrl: './SettingsComponent.html',
 	changeDetection: ChangeDetectionStrategy.Eager,
-	imports: [FaIconComponent, BackLinkComponent, InfoNoteComponent, SettingsNumbersComponent, SettingsGraphComponent, SettingsPlannerComponent, SettingsPlanDefaultsComponent, SettingsHotkeysComponent],
+	imports: [FaIconComponent, BackLinkComponent, InfoNoteComponent, SettingsNumbersComponent, SettingsGraphComponent, SettingsPlannerComponent, SettingsMapComponent, SettingsPlanDefaultsComponent, SettingsHotkeysComponent],
 	styles: [`
 		.settings-nav {
 			display: flex;
@@ -90,6 +91,7 @@ export class SettingsComponent implements OnDestroy
 			{id: 'numbers', label: 'Numbers', icon: faHashtag},
 			{id: 'graph', label: 'Graph', icon: faDiagramProject},
 			{id: 'planner', label: 'Planner', icon: faTableColumns},
+			{id: 'map', label: 'Map', icon: faMap},
 			{id: 'plan-defaults', label: 'Plan defaults', icon: faFileCirclePlus},
 			{id: 'hotkeys', label: 'Hotkeys', icon: faKeyboard},
 		];
@@ -114,7 +116,7 @@ export class SettingsComponent implements OnDestroy
 	public resetAll(): void
 	{
 		if (confirm('Put every setting back to its default?\n\n'
-			+ 'This covers numbers, graph, planner, plan defaults and hotkeys. Plans that never changed '
+			+ 'This covers numbers, graph, planner, map, plan defaults and hotkeys. Plans that never changed '
 			+ 'their own settings follow the plan defaults, so they change too. Panel positions and sizes stay as they are.')) {
 			this.settings.reset();
 		}

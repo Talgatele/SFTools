@@ -99,6 +99,16 @@
 
 		<help-button [topic]="activeTabHelpTopic()"/>
 
+		@if (mapAvailable()) {
+			<button
+				class="btn btn-sm btn-outline-secondary"
+				type="button"
+				tooltip="Open the map with a heatmap of where this factory has its resources nearby" placement="bottom"
+				[disabled]="!hasGraph()"
+				(click)="openFactorySites()"
+			><fa-icon [icon]="faIndustry"></fa-icon> Location</button>
+		}
+
 		<button
 			class="btn btn-sm btn-outline-secondary"
 			type="button"
@@ -164,7 +174,14 @@
 		</div>
 	</div>
 
-	@if (actions.solveError()) {
+	@if (actions.solveErrorIsSettingsProblem()) {
+		<info-note kind="warning" class="mx-2 mt-2">
+			<div class="d-flex align-items-start gap-2">
+				<span class="flex-grow-1">{{ actions.solveErrorDetail() }}</span>
+				<button type="button" class="btn-close btn-close-white btn-sm flex-shrink-0" aria-label="Dismiss" (click)="actions.setSolveError(null)"></button>
+			</div>
+		</info-note>
+	} @else if (actions.solveError()) {
 		<div class="alert alert-danger d-flex align-items-start gap-2 py-2 px-3 mx-2 mt-2 mb-0">
 			<span class="flex-grow-1">{{ actions.solveErrorDetail() ?? 'No solution was found.' }}</span>
 			<button type="button" class="btn-close flex-shrink-0" aria-label="Dismiss" (click)="actions.setSolveError(null)"></button>
@@ -424,7 +441,7 @@
 }
 
 @if (loadFromSave(); as target) {
-	<load-from-save-dialog [targetName]="target.name" [baseSettings]="target.baseSettings" (apply)="onLoadFromSaveApply($event)" (close)="closeLoadFromSave()"></load-from-save-dialog>
+	<load-from-save-dialog [targetName]="target.name" (apply)="onLoadFromSaveApply($event)" (close)="closeLoadFromSave()"></load-from-save-dialog>
 }
 
 <ng-template #tabStrip let-locks="locks">
