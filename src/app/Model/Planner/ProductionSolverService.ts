@@ -227,7 +227,8 @@ export class ProductionSolverService
 					: `no enabled recipe can make ${request.name}`;
 			});
 			return of(`No solution: ${details.join('; ')}. Add missing items in Inputs, or enable the recipes and resources that make them. `
-				+ 'Check the Inputs, Recipes, Machines and Resources tabs.');
+				+ this.missingIngredients(plan, data, lockedNodes)
+				+ ' Check the Inputs, Recipes, Machines and Resources tabs.');
 		}
 
 		const extra = this.extraPower.resolve(plan.settings);
@@ -273,7 +274,7 @@ export class ProductionSolverService
 					const shortages = this.findSupplyShortages(plan, result.nodes, data);
 					if (shortages.resources.length > 0 || shortages.inputs.length > 0) {
 						const resourceText = shortages.resources.map(shortage =>
-							`${shortage.name} needs ${this.rateText(shortage.needed)}/min, with ${this.rateText(shortage.available)}/min available`);
+							`${shortage.name}: ${this.rateText(shortage.needed)}/min needed, ${this.rateText(shortage.available)}/min available`);
 						const inputText = shortages.inputs.map(shortage =>
 							`${shortage.name} needs ${this.rateText(shortage.needed)}/min, with ${this.rateText(shortage.available)}/min provided`);
 						const location = poolFolder === null ? '' : ` Shared resources in folder ${poolFolder} are included.`;
@@ -381,6 +382,66 @@ export class ProductionSolverService
 			resources: toShortages(resourceUse, limits),
 			inputs: toShortages(inputUse, Object.fromEntries(inputAmounts)),
 		};
+	}
+
+	/** Find one route's blockers without treating alternative recipes as simultaneous requirements. */
+	private missingIngredients(plan: Plan, data: Data, lockedNodes: Node[]): string
+	{
+		const available = this.producibleItems(plan, data, lockedNodes);
+		const recipes = data.getRecipesForMachines();
+		const enabled = this.enabledRecipes.resolve(plan.settings, data);
+		const allowed = this.allowedRecipes(plan, data);
+		const paths = allowed.map(recipe => ({ingredients: recipe.ingredients.map(io => io.item.className),
+			products: recipe.products.map(io => io.item.className)}));
+		this.enabledGenerators(plan, data).forEach(option => {
+			if (option.fuel.byproduct) {
+				paths.push({ingredients: [option.fuel.item.className,
+					...(option.fuel.supplementalItem ? [option.fuel.supplementalItem.className] : [])],
+					products: [option.fuel.byproduct.className]});
+			}
+		});
+		const routes = new Map<string, Set<string>>();
+		const reasons = new Map<string, string>();
+		available.forEach(className => routes.set(className, new Set()));
+		data.items.forEach(item => {
+			if (available.has(item.className)) return;
+			if (data.resources.includes(item.className)) {
+				reasons.set(item.className, `${item.name} (enable or raise its limit in Resources)`);
+			} else if (!paths.some(path => path.products.includes(item.className))) {
+				const producers = recipes.filter(recipe => recipe.products.some(io => io.item.className === item.className));
+				const machineBlocked = producers.some(recipe => enabled.has(recipe.className)
+					&& this.enabledRecipes.isDisabledByMachine(recipe, plan.settings));
+				reasons.set(item.className, `${item.name} (${machineBlocked ? 'enable a producing machine in Machines'
+					: producers.length > 0 ? 'enable a producing recipe in Recipes' : 'no producing recipe available'}; or supply it in Inputs)`);
+			}
+			if (reasons.has(item.className)) routes.set(item.className, new Set([item.className]));
+		});
+		// Only propagate complete routes. Cycles cannot invent a source, and each
+		// replacement strictly reduces the number of blockers, so this terminates.
+		let changed = true;
+		while (changed) {
+			changed = false;
+			for (const path of paths) {
+				if (!path.ingredients.every(className => routes.has(className))) continue;
+				const blockers = new Set(path.ingredients.flatMap(className => [...routes.get(className)!]));
+				for (const product of path.products) {
+					if (!routes.has(product) || blockers.size < routes.get(product)!.size) {
+						routes.set(product, blockers);
+						changed = true;
+					}
+				}
+			}
+		}
+		return [...new Set(plan.requests.map(request => request.itemClassName))]
+			.filter(className => !available.has(className) && className !== ''
+				&& className !== SpecialClasses.PowerTarget && className !== SpecialClasses.SinkPointsTarget)
+			.map(className => {
+				const name = data.searchItemByClassName(className)?.name ?? className;
+				const blockers = routes.get(className);
+				return blockers?.size
+					? `One recipe route for ${name} is missing: ${[...blockers].map(item => reasons.get(item)).join(', ')}.`
+					: `${name} has no reachable ingredient source; supply it in Inputs or enable a recipe route with an external ingredient source.`;
+			}).join(' ');
 	}
 
 	private producibleItems(plan: Plan, data: Data, lockedNodes: Node[]): Set<string>
