@@ -217,7 +217,17 @@ export class ProductionSolverService
 
 		const unproducible = this.findUnproducibleRequests(plan, data, lockedNodes);
 		if (unproducible.length > 0) {
-			return of(`No solution: ${unproducible.join(', ')} cannot be made with the enabled recipes and raw resources. Check the Recipes, Machines and Resources tabs.`);
+			const details = unproducible.map(request => {
+				if (!request.recipe && request.missing.length === 1 && request.missing[0].name === request.name) {
+					return `${request.name} is unavailable in Resources`;
+				}
+				return request.missing.length > 0
+					? `${request.name} needs ${this.formatItemList(request.missing.map(item => item.name))}`
+						+ (request.recipe ? ` for the ${request.recipe.name} recipe` : '')
+					: `no enabled recipe can make ${request.name}`;
+			});
+			return of(`No solution: ${details.join('; ')}. Add missing items in Inputs, or enable the recipes and resources that make them. `
+				+ 'Check the Inputs, Recipes, Machines and Resources tabs.');
 		}
 
 		const extra = this.extraPower.resolve(plan.settings);
@@ -242,14 +252,33 @@ export class ProductionSolverService
 
 		// Dropping the limits from a maximise plan makes it unbounded rather
 		// than solvable, so the attribution re-solve only applies to fixed rates.
-		const constrained = Object.keys(plan.settings.resourceLimits ?? {}).length > 0 || (plan.settings.disabledResources?.length ?? 0) > 0;
+		const hasResourceConstraints = Object.keys(plan.settings.resourceLimits ?? {}).length > 0
+			|| (plan.settings.disabledResources?.length ?? 0) > 0;
+		const hasInputs = this.inputSources(plan, data).length > 0;
+		const constrained = hasResourceConstraints || hasInputs;
 		if (constrained && this.maximiseTarget(plan, data) === null) {
-			const unlimited: Plan = {...plan, settings: {...plan.settings, resourceLimits: undefined, disabledResources: undefined}};
+			const unlimited: Plan = {
+				...plan,
+				settings: {...plan.settings, resourceLimits: undefined, disabledResources: undefined},
+				// A second solve without supply caps shows which raw resources or provided inputs
+				// the requested production actually needs.
+				inputs: (plan.inputs ?? []).map(input => ({...input, amount: Math.max(input.amount, 1_000_000_000)})),
+			};
 			const poolFolder = this.pool.status(plan) === null ? null : this.planFolderName(plan);
 			return this.solve(unlimited, lockedNodes).pipe(
 				map(result => {
 					if (result.status !== 'Optimal') {
 						return generic;
+					}
+					const shortages = this.findSupplyShortages(plan, result.nodes, data);
+					if (shortages.resources.length > 0 || shortages.inputs.length > 0) {
+						const resourceText = shortages.resources.map(shortage =>
+							`${shortage.name} needs ${this.rateText(shortage.needed)}/min, with ${this.rateText(shortage.available)}/min available`);
+						const inputText = shortages.inputs.map(shortage =>
+							`${shortage.name} needs ${this.rateText(shortage.needed)}/min, with ${this.rateText(shortage.available)}/min provided`);
+						const location = poolFolder === null ? '' : ` Shared resources in folder ${poolFolder} are included.`;
+						return `No solution: ${[...resourceText, ...inputText].join('; ')}.${location} `
+							+ 'Raise the resource limits or add more items in Resources and Inputs.';
 					}
 					return poolFolder === null
 						? 'No solution: the raw resource limits are too low, or a needed resource is off. Change this in the Resources tab.'
@@ -270,16 +299,88 @@ export class ProductionSolverService
 		return folder === null ? 'the folder' : `"${folder}"`;
 	}
 
-	private findUnproducibleRequests(plan: Plan, data: Data, lockedNodes: Node[]): string[]
+	private findUnproducibleRequests(
+		plan: Plan,
+		data: Data,
+		lockedNodes: Node[],
+	): {name: string; recipe: Recipe | null; missing: Item[]}[]
 	{
 		const producible = this.producibleItems(plan, data, lockedNodes);
+		const producers = new Map<string, Recipe[]>();
+		this.allowedRecipes(plan, data).forEach(recipe => recipe.products.forEach(product => {
+			const choices = producers.get(product.item.className) ?? [];
+			choices.push(recipe);
+			producers.set(product.item.className, choices);
+		}));
 
 		return plan.requests
 			.filter(request => request.itemClassName !== ''
 				&& request.itemClassName !== SpecialClasses.PowerTarget
 				&& request.itemClassName !== SpecialClasses.SinkPointsTarget)
 			.filter(request => !producible.has(request.itemClassName))
-			.map(request => data.searchItemByClassName(request.itemClassName)?.name ?? request.itemClassName);
+			.map(request => {
+				const item = data.searchItemByClassName(request.itemClassName);
+				const recipes = producers.get(request.itemClassName) ?? [];
+				const options = recipes.map(recipe => ({
+					recipe,
+					missing: [...new Map(recipe.ingredients
+						.filter(ingredient => !producible.has(ingredient.item.className))
+						.map(ingredient => [ingredient.item.className, ingredient.item])).values()],
+				})).sort((a, b) => a.missing.length - b.missing.length || a.recipe.name.localeCompare(b.recipe.name));
+				return {
+					name: item?.name ?? request.itemClassName,
+					recipe: options[0]?.recipe ?? null,
+					missing: options[0]?.missing ?? (data.resources.includes(request.itemClassName) && item ? [item] : []),
+				};
+			});
+	}
+
+	private formatItemList(items: string[]): string
+	{
+		if (items.length < 2) return items[0] ?? '';
+		return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+	}
+
+	private rateText(rate: number): string
+	{
+		return String(Number(rate.toFixed(3)));
+	}
+
+	private findSupplyShortages(
+		plan: Plan,
+		nodes: Node[],
+		data: Data,
+	): {resources: {name: string; needed: number; available: number}[]; inputs: {name: string; needed: number; available: number}[]}
+	{
+		const limits = this.pool.effectiveLimits(plan);
+		const inputAmounts = new Map(this.inputSources(plan, data).map(input => [input.item.className, input.amount]));
+		const resourceUse = new Map<string, number>();
+		const inputUse = new Map<string, number>();
+		nodes.forEach(node => {
+			if (node instanceof MineNode) {
+				resourceUse.set(node.item.className, (resourceUse.get(node.item.className) ?? 0) + node.amount);
+			} else if (node instanceof InputNode) {
+				inputUse.set(node.item.className, (inputUse.get(node.item.className) ?? 0) + node.amount);
+			}
+		});
+
+		const toShortages = (use: Map<string, number>, available: Record<string, number>): {name: string; needed: number; available: number}[] =>
+			[...use.entries()]
+				.filter(([className, needed]) => {
+					const amount = available[className];
+					return amount !== undefined && Number.isFinite(amount) && needed - amount > Math.max(1e-6, needed * 1e-6);
+				})
+				.map(([className, needed]) => ({
+					name: data.searchItemByClassName(className)?.name ?? className,
+					needed,
+					available: available[className],
+				}))
+				.sort((a, b) => a.name.localeCompare(b.name));
+
+		return {
+			resources: toShortages(resourceUse, limits),
+			inputs: toShortages(inputUse, Object.fromEntries(inputAmounts)),
+		};
 	}
 
 	private producibleItems(plan: Plan, data: Data, lockedNodes: Node[]): Set<string>
