@@ -125,7 +125,65 @@ test('selecting Power starts maximisation and enables fuels for a new power plan
 	component.rows.push({itemClassName: 'Rod', mode: 'satisfactory', ratePerMinute: 0});
 	row.itemClassName = '';
 	component.onItemChange(row, SpecialClasses.PowerTarget);
-	assert.equal(row.mode, undefined, 'incompatible automatic targets keep power at a fixed rate');
+	assert.equal(row.mode, 'satisfactory', 'power joins the automatic item requests');
+	assert.equal(component.maximiseDisabled(row, 'maximise'), false);
+	assert.equal(component.maximiseDisabled(component.rows[1], 'satisfactory-plus'), false);
+	component.rows.push({itemClassName: SpecialClasses.SinkPointsTarget, mode: 'maximise', ratePerMinute: 0});
+	component.sinkPointsTargetClass = SpecialClasses.SinkPointsTarget;
+	assert.equal(component.maximiseDisabled(row), true, 'sink points remain a separate goal');
+});
+
+test('720 oil prioritises fuel power with useful plastic and rubber production, including Satisfactory+', async () => {
+	const parts = ['Oil', 'Plastic', 'Rubber', 'HeavyOilResidue', 'Fuel'].map(className =>
+		Object.assign(Object.create(Item.prototype), {className, name: className, sinkPoints: 0,
+			form: ['Plastic', 'Rubber'].includes(className) ? 'solid' : 'liquid', energy: className === 'Fuel' ? 750 : 0}));
+	const part = name => parts.find(item => item.className === name);
+	const refinery = {...machine, className: 'Refinery', powerUsage: 30};
+	const oilRecipe = (name, ingredients, products) => ({...recipe(name, {}, {}), producedIn: [refinery],
+		ingredients: Object.entries(ingredients).map(([name, amount]) => ({item: part(name), amount})),
+		products: Object.entries(products).map(([name, amount]) => ({item: part(name), amount}))});
+	const oilRecipes = [oilRecipe('Plastic', {Oil: 30}, {Plastic: 20, HeavyOilResidue: 10}),
+		oilRecipe('Rubber', {Oil: 30}, {Rubber: 20, HeavyOilResidue: 20}),
+		oilRecipe('ResidualFuel', {HeavyOilResidue: 60}, {Fuel: 40}),
+		oilRecipe('Fuel', {Oil: 60}, {Fuel: 40})];
+	const fuel = {item: part('Fuel'), supplementalItem: null, byproduct: null, byproductAmount: 0};
+	const generator = {className: 'FuelGenerator', name: 'Fuel-Powered Generator', powerProduction: 250,
+		canOverclock: true, fuel: [fuel]};
+	const oilData = {...data, items: parts, resources: ['Oil'], getRecipesForMachines: () => oilRecipes,
+		getItemByClassName: part, searchItemByClassName: part,
+		getRecipeByClassName: name => oilRecipes.find(recipe => recipe.className === name),
+		getBuildingByClassName: name => name === generator.className ? generator : refinery};
+	for (const [mode, customRate] of [['maximise'], ['satisfactory'], ['satisfactory-plus'], ['satisfactory-plus', 80]]) {
+		const instance = service();
+		const p = {settings: {}, requests: ['Plastic', 'Rubber'].map(itemClassName =>
+			({itemClassName, mode, ratePerMinute: 0, ...(customRate === undefined ? {} : {satisfactoryOverride: customRate})}))};
+		p.requests.push({itemClassName: SpecialClasses.PowerTarget,
+			mode: mode === 'satisfactory-plus' ? mode : 'maximise', ratePerMinute: 0});
+		const request = {...base(0, oilRecipes), resourceLimits: {Oil: 720},
+			optimisation: {...base().optimisation, rawResources: {Oil: 1}, machines: 0.1},
+			generators: [{generator, fuel, clockSpeed: 100}]};
+		const result = await firstValueFrom(instance.solveMaximise(p, oilData, request, instance.maximiseTarget(p, oilData), []));
+		assert.equal(result.status, 'Optimal', mode);
+		assert.ok(Math.abs(result.achievedMaximums.Plastic - (customRate ?? 40)) < 0.001, mode);
+		assert.ok(Math.abs(result.achievedMaximums.Rubber - (customRate ?? 40)) < 0.001, mode);
+		const expectedPower = customRate === undefined ? 5500 : 5000;
+		assert.ok(Math.abs(result.achievedMaximums[SpecialClasses.PowerTarget] - expectedPower) < 0.001,
+			`${mode}: ${result.achievedMaximums[SpecialClasses.PowerTarget]}`);
+		const generators = result.nodes.filter(node => node.type === 'generator');
+		assert.equal(generators.length, 1);
+		assert.ok(Math.abs(generators[0].amount - expectedPower / 250) < 0.001);
+		assert.ok(result.nodes.filter(node => node.type === 'mine').reduce((sum, node) => sum + node.amount, 0) <= 720.001);
+		const balances = new Map();
+		for (const node of result.nodes) {
+			for (const io of node.outputs) balances.set(io.item.className, (balances.get(io.item.className) ?? 0) + io.maxAmount);
+			for (const io of node.inputs) balances.set(io.item.className, (balances.get(io.item.className) ?? 0) - io.maxAmount);
+			if (mode === 'satisfactory-plus' && node.type === 'recipe') {
+				assert.ok(node.groups.every(group => group.clockSpeed === 100 && Number.isInteger(group.machines)));
+			}
+		}
+		for (const [name, balance] of balances) assert.ok(Math.abs(balance) < 0.001, `${mode}: ${name} = ${balance}`);
+		assert.ok(new GraphEdgeBuilder().build(result.nodes).some(edge => edge.targetId === generators[0].id && edge.itemClassName === 'Fuel'));
+	}
 });
 
 test('power maximisation respects both coal and water supply and builds connected generator nodes', async () => {

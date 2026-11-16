@@ -1,5 +1,5 @@
 import {Injectable} from '@angular/core';
-import {catchError, firstValueFrom, map, Observable, of} from 'rxjs';
+import {catchError, firstValueFrom, map, Observable, of, switchMap} from 'rxjs';
 import {Data} from '@src/Model/Data/Data';
 import {Recipe} from '@src/Model/Data/Entities/Recipe';
 import {VersionManager} from '@src/Model/Data/VersionManager';
@@ -162,7 +162,7 @@ export class ProductionSolverService
 		return tenth > 0 ? tenth : maximum;
 	}
 
-	/** The UI enforces a single maximised category, but synced data may not. */
+	/** Combined plans reserve modest material targets before maximising power. */
 	private maximiseTarget(plan: Plan, data: Data): MaximiseTarget | null
 	{
 		const rows = plan.requests.filter(request => request.mode !== undefined && request.mode !== 'rate' && request.itemClassName !== '');
@@ -170,14 +170,18 @@ export class ProductionSolverService
 			return null;
 		}
 		const categories = new Set<MaximiseCategory>(rows.map(row => this.categoryOf(row.itemClassName)));
-		if (categories.size > 1) {
-			throw new SolveSettingsError('Only one kind of target (items, power or sink points) can be maximised at a time.');
+		if (categories.size > 1 && categories.has('sinkPoints')) {
+			throw new SolveSettingsError('Sink points cannot be maximised together with automatic item or power targets.');
 		}
-		const category = [...categories][0];
+		const category = categories.has('items') ? 'items' : [...categories][0];
 		const items = category !== 'items' ? [] : [...new Set(rows.map(row => row.itemClassName))]
 			.map(className => data.searchItemByClassName(className))
 			.filter((item): item is Item => item !== undefined);
-		return {category, items, satisfactory: rows.some(row => (row.mode === 'satisfactory' || row.mode === 'satisfactory-plus'))};
+		return {category, items,
+			satisfactory: rows.some(row => this.categoryOf(row.itemClassName) === category
+				&& (row.mode === 'satisfactory' || row.mode === 'satisfactory-plus')),
+			...(category === 'items' && categories.has('power') ? {alsoPower: true} : {}),
+		};
 	}
 
 	private categoryOf(itemClassName: string): MaximiseCategory
@@ -1144,6 +1148,33 @@ export class ProductionSolverService
 				recipeClockSpeeds: {}, machineClockSpeeds: {}, generatorClockSpeeds: {},
 				generators: base.generators.map(option => ({...option, clockSpeed: 100}))};
 		}
+		if (maximise.alsoPower) {
+			const isAutomaticPower = (row: Plan['requests'][number]) => row.itemClassName === SpecialClasses.PowerTarget
+				&& row.mode !== undefined && row.mode !== 'rate';
+			const itemPlan: Plan = {...plan, requests: plan.requests.filter(row => !isAutomaticPower(row)).map(row =>
+				row.mode === 'maximise' ? {...row, mode: 'satisfactory'} : row)};
+			return this.solveMaximise(itemPlan, data, base,
+				{...maximise, alsoPower: false, satisfactory: true, reserveForPower: true}, lockedNodes).pipe(
+				switchMap(items => {
+					if (items.status !== 'Optimal') return of(items);
+					const rates = items.achievedMaximums ?? {};
+					const powerPlan: Plan = {...plan, requests: plan.requests.map(row =>
+						!isAutomaticPower(row) && row.mode !== undefined && row.mode !== 'rate'
+							? {...row, mode: 'rate', ratePerMinute: rates[row.itemClassName] ?? 0} : row)};
+					const powerBase: SolverRequest = {...base, productions: [
+						...base.productions,
+						...maximise.items.map(item => ({item, amount: rates[item.className] ?? 0})),
+					]};
+					// Re-solve the complete factory, rather than freezing the first pass's
+					// recipes or discarding its byproducts. All original supply caps still apply.
+					return this.solveMaximise(powerPlan, data, powerBase, {category: 'power', items: [],
+						satisfactory: powerPlan.requests.some(row => isAutomaticPower(row)
+							&& (row.mode === 'satisfactory' || row.mode === 'satisfactory-plus'))}, lockedNodes).pipe(
+						map(power => ({...power, achievedMaximums: {...rates, ...power.achievedMaximums}})),
+					);
+				}),
+			);
+		}
 		return new Observable<SolverResponse>(subscriber => {
 			const run: SolveRunHandle = {cancelled: false, cancelCurrent: null};
 			(maximise.satisfactory && maximise.category === 'items'
@@ -1183,6 +1214,19 @@ export class ProductionSolverService
 		const automatic = maximise.items.filter(item => rows.some(row => row.itemClassName === item.className
 			&& row.satisfactoryOverride === undefined));
 		const targets = satisfactoryTargets(data, request.recipes, automatic);
+		const basicPowerTargets = new Set<string>();
+		const fullMachineRate = (recipe: Recipe, item: Item) => 2 * Formulas.referenceCycles(recipe, recipe.producedIn[0])
+			* (recipe.products.find(product => product.item === item)?.amount ?? 0);
+		if (maximise.reserveForPower) {
+			for (const target of targets) {
+				if (target.rate !== null) continue;
+				const recipe = request.recipes.find(recipe => recipe.producedIn.length > 0
+					&& recipe.products.some(product => product.item === target.item));
+				if (!recipe) continue;
+				basicPowerTargets.add(target.item.className);
+				target.rate = fullMachineRate(recipe, target.item);
+			}
+		}
 		const automaticCaps = new Map(targets.map(target => [target.item.className, target.rate ?? Infinity]));
 		for (const target of targets.filter(target => target.rate !== null)) {
 			let cap = target.rate!;
@@ -1207,7 +1251,8 @@ export class ProductionSolverService
 					.filter((node): node is RecipeNode => node instanceof RecipeNode && node.target > 1e-6
 						&& node.recipe.products.some(product => product.item === target.item))
 					.sort((a, b) => b.target - a.target)[0];
-				const selectedCap = used === undefined ? cap : satisfactoryRecipeRate(used.recipe, target.item, target.multiplier);
+				const selectedCap = used === undefined ? cap : basicPowerTargets.has(target.item.className)
+					? fullMachineRate(used.recipe, target.item) : satisfactoryRecipeRate(used.recipe, target.item, target.multiplier);
 				if (attempt >= 1 || selectedCap === cap) break;
 				cap = selectedCap;
 			}
@@ -1233,7 +1278,7 @@ export class ProductionSolverService
 		// Rebuild from all targets together: rounded rates must change the factory,
 		// and cancellation must still terminate the active worker.
 		let solution = await this.awaitSolve(this.buildLp(request, data, lockedNodes), this.solveOptions(request, plan), run);
-		if (this.mapStatus(solution.Status) === 'Optimal' && automatic.length > 0) {
+		if (this.mapStatus(solution.Status) === 'Optimal' && automatic.length > 0 && !maximise.reserveForPower) {
 			const baseline = this.columnsOf(solution);
 			const refinement = new SatisfactoryFactoryRefinement(request, baseline, automaticCaps);
 			if (refinement.score(baseline) > 1e-5) {

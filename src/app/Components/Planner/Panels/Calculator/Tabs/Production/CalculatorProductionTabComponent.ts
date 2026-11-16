@@ -109,7 +109,11 @@ export class CalculatorProductionTabComponent implements OnDestroy
 		row.satisfactoryOverride = undefined;
 		if (value === this.powerTargetClass && previous !== value) {
 			// Power planning starts by using the available supply, without rounding away output.
-			row.mode = this.maximiseDisabled(row) ? undefined : 'maximise';
+			const automatic = this.rows.find(other => other !== row && other.itemClassName !== ''
+				&& this.modeOf(other) !== 'rate');
+			const mode = automatic?.mode === 'satisfactory' || automatic?.mode === 'satisfactory-plus'
+				? automatic.mode : 'maximise';
+			row.mode = this.maximiseDisabled(row, mode) ? undefined : mode;
 			const settings = this.planManager.activeSettings();
 			const data = this.versionManager.activeVersionData();
 			// A new plan has no enabled fuels. Make its first power request usable,
@@ -211,14 +215,17 @@ export class CalculatorProductionTabComponent implements OnDestroy
 
 	public maximiseDisabled(row: ProductionRequest, mode: 'maximise' | 'satisfactory' | 'satisfactory-plus' = 'maximise'): boolean
 	{
-		const active = this.rows.find(other => other !== row
-			&& this.modeOf(other) !== 'rate'
-			&& other.itemClassName !== '');
-		return active !== undefined
-			&& ((this.modeOf(active) !== mode
-				&& !((this.modeOf(active) === 'satisfactory' || this.modeOf(active) === 'satisfactory-plus')
-					&& (mode === 'satisfactory' || mode === 'satisfactory-plus')))
-				|| this.categoryOf(active.itemClassName) !== this.categoryOf(row.itemClassName));
+		const category = this.categoryOf(row.itemClassName);
+		return this.rows.some(other => {
+			if (other === row || this.modeOf(other) === 'rate' || other.itemClassName === '') return false;
+			const otherCategory = this.categoryOf(other.itemClassName);
+			if (category !== otherCategory) {
+				return category === 'sinkPoints' || otherCategory === 'sinkPoints';
+			}
+			return this.modeOf(other) !== mode
+				&& !((this.modeOf(other) === 'satisfactory' || this.modeOf(other) === 'satisfactory-plus')
+					&& (mode === 'satisfactory' || mode === 'satisfactory-plus'));
+		});
 	}
 
 	public achievedFor(row: ProductionRequest): string | null
