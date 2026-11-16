@@ -104,7 +104,7 @@ export class ProductionSolverService
 		return this.solver.solve(lp, this.solveOptions(request, plan)).pipe(
 			map(solution => {
 				const response = this.parseSolution(solution, data, this.groupingModes.resolve(plan.settings));
-				return {...response, nodes: [...response.nodes, ...this.augmenterNodes(plan, data)]};
+				return this.rollUpRequestedSurplus({...response, nodes: [...response.nodes, ...this.augmenterNodes(plan, data)]}, plan);
 			}),
 		);
 	}
@@ -177,7 +177,7 @@ export class ProductionSolverService
 		const items = category !== 'items' ? [] : [...new Set(rows.map(row => row.itemClassName))]
 			.map(className => data.searchItemByClassName(className))
 			.filter((item): item is Item => item !== undefined);
-		return {category, items, satisfactory: rows.some(row => row.mode === 'satisfactory')};
+		return {category, items, satisfactory: rows.some(row => (row.mode === 'satisfactory' || row.mode === 'satisfactory-plus'))};
 	}
 
 	private categoryOf(itemClassName: string): MaximiseCategory
@@ -644,6 +644,7 @@ export class ProductionSolverService
 
 	private clockFor(request: SolverRequest, recipe: Recipe, machine: Building): number
 	{
+		if (request.fullSpeedMachines) return 100;
 		return request.recipeClockSpeeds[recipe.className]
 			?? request.machineClockSpeeds[machine.className]
 			?? request.defaultClockSpeed;
@@ -684,6 +685,7 @@ export class ProductionSolverService
 		const lines: string[] = ['\\\\ Production Plan', 'Minimize'];
 		// Integer "_count >= column" companions, shared by somersloops and whole-machine counting.
 		const countedColumns = new Set<string>();
+		const fullSpeedColumns = new Set<string>();
 
 		if (refinement) {
 			lines.push(refinement.objective);
@@ -770,6 +772,7 @@ export class ProductionSolverService
 				for (let sloops = 0; sloops <= Math.min(request.maxSloops, machine.sloopSlots); sloops++) {
 					const boost = Formulas.sloopOutputMultiplier(machine, sloops);
 					const recipeClass = recipe.className + '@' + machine.className + '%' + clockSpeed + '#' + sloops;
+					if (request.fullSpeedMachines) fullSpeedColumns.add(recipeClass);
 
 					recipe.ingredients.forEach(ingredient => {
 						const amount = ingredient.amount * speed;
@@ -800,6 +803,7 @@ export class ProductionSolverService
 		request.generators.forEach(option => {
 			const {generator, fuel, clockSpeed} = option;
 			const varName = this.generatorVariableName(option);
+			if (request.fullSpeedMachines) fullSpeedColumns.add(varName);
 			const burnRate = Formulas.generatorBurnRate(generator, fuel, clockSpeed);
 			add(fuel.item.className, '- ' + burnRate + ' ' + varName);
 			if (fuel.supplementalItem !== null) {
@@ -997,8 +1001,9 @@ export class ProductionSolverService
 			lines.push(this.lockedVariableName(node) + ' = 1');
 		});
 
-		if (countedColumns.size || refinement?.generals.length) {
+		if (countedColumns.size || fullSpeedColumns.size || refinement?.generals.length) {
 			lines.push('\nGeneral');
+			lines.push(...fullSpeedColumns);
 			countedColumns.forEach(column => {
 				lines.push(column + '_count');
 			});
@@ -1012,6 +1017,44 @@ export class ProductionSolverService
 		lines.push('End');
 
 		return lines.join('\n');
+	}
+
+	/** Requested outputs include all unused production, even when the target was rounded. */
+	private rollUpRequestedSurplus(response: SolverResponse, plan: Plan): SolverResponse
+	{
+		const requested = new Set(plan.requests.map(row => row.itemClassName));
+		const surplus = new Map<string, number>();
+		for (const node of response.nodes) {
+			if (node instanceof ByproductNode && requested.has(node.item.className) && !node.locked) {
+				surplus.set(node.item.className, (surplus.get(node.item.className) ?? 0) + node.amount);
+			}
+		}
+		if (surplus.size === 0) return response;
+		const nodes = response.nodes.filter(node => !(node instanceof ByproductNode
+			&& surplus.has(node.item.className) && !node.locked)).map(node => {
+			if (!(node instanceof ProductNode) || !surplus.has(node.item.className) || node.locked) return node;
+			const product = new ProductNode(node.id, node.amount + surplus.get(node.item.className)!, node.item);
+			product.x = node.x;
+			product.y = node.y;
+			product.done = node.done;
+			surplus.delete(node.item.className);
+			return product;
+		});
+		// Zero targets may have no product node yet.
+		for (const [className, amount] of surplus) {
+			const source = response.nodes.find((node): node is ByproductNode =>
+				node instanceof ByproductNode && node.item.className === className)!;
+			nodes.push(new ProductNode(source.id, amount, source.item));
+		}
+		const achievedMaximums = response.achievedMaximums ? {...response.achievedMaximums} : undefined;
+		if (achievedMaximums) {
+			for (const node of nodes) {
+				if (node instanceof ProductNode && Object.hasOwn(achievedMaximums, node.item.className)) {
+					achievedMaximums[node.item.className] = node.amount;
+				}
+			}
+		}
+		return {...response, nodes, ...(achievedMaximums ? {achievedMaximums} : {})};
 	}
 
 	private columnsOf(solution: HighsSolution): Map<string, number>
@@ -1091,13 +1134,23 @@ export class ProductionSolverService
 
 	private solveMaximise(plan: Plan, data: Data, base: SolverRequest, maximise: MaximiseTarget, lockedNodes: Node[]): Observable<SolverResponse>
 	{
+		if (plan.requests.some(row => row.mode === 'satisfactory-plus')) {
+			if (lockedNodes.some(node => node instanceof RecipeNode
+				? node.groups.some(group => group.clockSpeed !== 100 || !Number.isInteger(group.machines))
+				: node instanceof GeneratorNode && (node.clockSpeed !== 100 || !Number.isInteger(node.amount)))) {
+				throw new SolveSettingsError('Satisfactory+ requires locked machines to run at 100% with whole machine counts. Unlock or update these machines.');
+			}
+			base = {...base, fullSpeedMachines: true, defaultClockSpeed: 100,
+				recipeClockSpeeds: {}, machineClockSpeeds: {}, generatorClockSpeeds: {},
+				generators: base.generators.map(option => ({...option, clockSpeed: 100}))};
+		}
 		return new Observable<SolverResponse>(subscriber => {
 			const run: SolveRunHandle = {cancelled: false, cancelCurrent: null};
 			(maximise.satisfactory && maximise.category === 'items'
 				? this.runSatisfactory(plan, data, base, maximise, lockedNodes, run)
 				: this.runMaximiseRounds(plan, data, base, maximise, lockedNodes, run))
 				.then(response => {
-					subscriber.next(response);
+					subscriber.next(this.rollUpRequestedSurplus(response, plan));
 					subscriber.complete();
 				})
 				.catch((err: unknown) => {
@@ -1116,7 +1169,7 @@ export class ProductionSolverService
 		plan: Plan, data: Data, base: SolverRequest, maximise: MaximiseTarget, lockedNodes: Node[], run: SolveRunHandle,
 	): Promise<SolverResponse>
 	{
-		const rows = plan.requests.filter(row => row.mode === 'satisfactory' && row.itemClassName !== '');
+		const rows = plan.requests.filter(row => (row.mode === 'satisfactory' || row.mode === 'satisfactory-plus') && row.itemClassName !== '');
 		const achieved: Record<string, number> = {};
 		let request: SolverRequest = {...base, recipes: preferSpaceElevatorRecipes(base.recipes), productions: [...base.productions]};
 		for (const row of rows) {
@@ -1313,13 +1366,13 @@ export class ProductionSolverService
 		}
 
 		this.netCarries(merged);
-		if (maximise.satisfactory) {
+		if (maximise.satisfactory && !base.fullSpeedMachines) {
 			// Rebuild at clean rates instead of merely rounding the displayed maximum.
 			// Only satisfactory rows are converted: a mixed plan may still contain
 			// ordinary maximise rows, which must remain maximised by the follow-up solve.
 			const satisfactoryMaximums = Object.fromEntries(
 				plan.requests
-					.filter(request => request.mode === 'satisfactory' && request.itemClassName !== '')
+					.filter(request => (request.mode === 'satisfactory' || request.mode === 'satisfactory-plus') && request.itemClassName !== '')
 					.map(request => request.itemClassName)
 					.filter((itemClassName, index, requests) => requests.indexOf(itemClassName) === index)
 					.map(itemClassName => [itemClassName, this.cleanProductionRate(achieved[itemClassName] ?? 0)]),
@@ -1327,7 +1380,7 @@ export class ProductionSolverService
 			const fixedPlan: Plan = {
 				...plan,
 				requests: plan.requests.map(request => {
-					if (request.mode !== 'satisfactory' || request.itemClassName === '') {
+					if ((request.mode !== 'satisfactory' && request.mode !== 'satisfactory-plus') || request.itemClassName === '') {
 						return request;
 					}
 					const rate = satisfactoryMaximums[request.itemClassName];

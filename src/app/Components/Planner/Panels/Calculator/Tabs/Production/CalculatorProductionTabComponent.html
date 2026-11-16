@@ -45,7 +45,7 @@
 										step="any"
 									>
 								}
-							} @else if (modeOf(row) === 'satisfactory' && row.itemClassName !== powerTargetClass && row.itemClassName !== sinkPointsTargetClass) {
+							} @else if ((modeOf(row) === 'satisfactory' || modeOf(row) === 'satisfactory-plus') && row.itemClassName !== powerTargetClass && row.itemClassName !== sinkPointsTargetClass) {
 								<input
 									type="number"
 									class="form-control form-control-sm bg-dark text-light"
@@ -80,6 +80,7 @@
 									<option value="TW">TW</option>
 									<option value="maximise" [disabled]="maximiseDisabled(row)">maximise</option>
 									<option value="satisfactory" [disabled]="maximiseDisabled(row, 'satisfactory')">Satisfactory mode</option>
+									<option value="satisfactory-plus" [disabled]="maximiseDisabled(row, 'satisfactory-plus')">Satisfactory+ mode</option>
 								</select>
 							} @else {
 								<select
@@ -92,10 +93,11 @@
 									<option value="rate">{{ rateUnit(row.itemClassName) }}</option>
 									<option value="maximise" [disabled]="maximiseDisabled(row)">maximise</option>
 									<option value="satisfactory" [disabled]="maximiseDisabled(row, 'satisfactory')">Satisfactory mode</option>
+									<option value="satisfactory-plus" [disabled]="maximiseDisabled(row, 'satisfactory-plus')">Satisfactory+ mode</option>
 								</select>
 							}
 						</div>
-						@if (modeOf(row) === 'satisfactory' && row.satisfactoryOverride !== undefined) {
+						@if ((modeOf(row) === 'satisfactory' || modeOf(row) === 'satisfactory-plus') && row.satisfactoryOverride !== undefined) {
 							<div class="small text-warning mt-1">
 								Custom · {{ rateUnit(row.itemClassName) }}
 								<button type="button" class="btn btn-link btn-sm p-0 ms-2" (click)="resetSatisfactoryRate(row)">Reset to auto</button>
@@ -122,6 +124,12 @@
 		<info-note kind="warning" class="mt-2">
 			Somersloops with a maximised item make the calculation much slower.
 			It can take a very long time.
+		</info-note>
+	}
+	@if (hasPowerTarget) {
+		<info-note class="mt-2">
+			Maximise power uses the available fuel and water in Inputs and Resources.
+			Choose allowed generator fuels in the Power tab. The graph shows generator counts and power output.
 		</info-note>
 	}
 </div>

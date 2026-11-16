@@ -15,6 +15,7 @@ final class SharedPlanLibrary
 	private string $password;
 	private string $origin;
 	private string $cookie;
+	private bool $secureCookie;
 	private const SESSION_SECONDS = 7 * 86400;
 	private const MAX_BODY = 16 * 1024 * 1024;
 
@@ -32,7 +33,11 @@ final class SharedPlanLibrary
 			|| ($parts['scheme'] === 'http' && !in_array($parts['host'], ['localhost', '127.0.0.1', '[::1]'], true))) {
 			throw new LibraryHttpError(503, 'SFTOOLS_ORIGIN must be the HTTPS site origin (HTTP is allowed only on localhost).');
 		}
-		$this->cookie = $parts['scheme'] === 'https' ? '__Host-sftools_library' : 'sftools_library';
+		$localRequest = self::isLoopbackAuthority((string) ($_SERVER['HTTP_HOST'] ?? ''));
+		$this->secureCookie = $localRequest
+			? !empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off'
+			: $parts['scheme'] === 'https';
+		$this->cookie = $this->secureCookie ? '__Host-sftools_library' : 'sftools_library';
 		$directory = (string) (getenv('SFTOOLS_DATA_DIR') ?: '/var/lib/sftools');
 		if (!is_dir($directory) || !is_writable($directory)) {
 			throw new LibraryHttpError(503, 'The server library data directory is not writable.');
@@ -183,12 +188,46 @@ final class SharedPlanLibrary
 
 	private function setCookie(string $token, int $expires): void
 	{
-		setcookie($this->cookie, $token, ['expires' => $expires, 'path' => '/', 'secure' => str_starts_with($this->origin, 'https:'), 'httponly' => true, 'samesite' => 'Strict']);
+		setcookie($this->cookie, $token, ['expires' => $expires, 'path' => '/', 'secure' => $this->secureCookie, 'httponly' => true, 'samesite' => 'Strict']);
 	}
 
 	private function checkOrigin(): void
 	{
-		if (!hash_equals($this->origin, (string) ($_SERVER['HTTP_ORIGIN'] ?? ''))) throw new LibraryHttpError(403, 'This request must come from the library website.');
+		$requestOrigin = (string) ($_SERVER['HTTP_ORIGIN'] ?? '');
+		if (hash_equals($this->origin, $requestOrigin) || $this->isLocalRequestOrigin($requestOrigin)) return;
+		throw new LibraryHttpError(403, 'This request must come from the library website.');
+	}
+
+	private function isLocalRequestOrigin(string $origin): bool
+	{
+		$parts = parse_url($origin);
+		if (!is_array($parts) || ($parts['scheme'] ?? '') !== 'http' || !isset($parts['host'])
+			|| isset($parts['user']) || isset($parts['pass']) || isset($parts['path'])
+			|| isset($parts['query']) || isset($parts['fragment'])
+			|| !self::isLoopbackHost((string) $parts['host'])) return false;
+
+		$request = parse_url('http://' . (string) ($_SERVER['HTTP_HOST'] ?? ''));
+		if (!is_array($request) || !isset($request['host']) || isset($request['user']) || isset($request['pass'])
+			|| isset($request['path']) || isset($request['query']) || isset($request['fragment'])
+			|| !self::isLoopbackHost((string) $request['host'])) return false;
+
+		$originPort = (int) ($parts['port'] ?? 80);
+		$requestPort = (int) ($request['port'] ?? 80);
+		return strtolower(trim((string) $parts['host'], '[]')) === strtolower(trim((string) $request['host'], '[]'))
+			&& $originPort === $requestPort;
+	}
+
+	private static function isLoopbackAuthority(string $authority): bool
+	{
+		$parts = parse_url('http://' . $authority);
+		return is_array($parts) && isset($parts['host']) && !isset($parts['user']) && !isset($parts['pass'])
+			&& !isset($parts['path']) && !isset($parts['query']) && !isset($parts['fragment'])
+			&& self::isLoopbackHost((string) $parts['host']);
+	}
+
+	private static function isLoopbackHost(string $host): bool
+	{
+		return in_array(strtolower(trim($host, '[]')), ['localhost', '127.0.0.1', '::1'], true);
 	}
 
 	private function body(int $limit): array

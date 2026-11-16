@@ -10,6 +10,8 @@ import {ProductionTarget} from '@src/Model/Planner/Solver/Request/ProductionTarg
 export interface SolverRequest
 {
 
+	/** Require integral machine counts at 100% clock speed. */
+	fullSpeedMachines?: boolean;
 	optimisation: OptimisationTarget;
 	productions: ProductionTarget[];
 	maximise: MaximiseTarget | null;

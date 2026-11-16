@@ -55,7 +55,7 @@ export class CalculatorQuickStartComponent
 		const plan = this.planManager.createPlan('', null);
 		this.planManager.setActivePlan(plan.id);
 		this.planManager.setRequests(plan.id, [{itemClassName, ratePerMinute: CalculatorQuickStartComponent.DEFAULT_RATE,
-			mode: itemClassName === SpecialClasses.PowerTarget || itemClassName === SpecialClasses.SinkPointsTarget ? undefined : 'satisfactory'}]);
+			mode: itemClassName === SpecialClasses.PowerTarget || itemClassName === SpecialClasses.SinkPointsTarget ? undefined : 'satisfactory-plus'}]);
 		// The watcher has no previous plan on first activation, so start this first calculation explicitly.
 		if (this.planManager.activeSettings()?.calculationMode === 'automatic') {
 			this.actions.requestCalculate();

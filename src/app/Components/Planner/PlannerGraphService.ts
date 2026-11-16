@@ -2691,7 +2691,7 @@ export class PlannerGraphService implements OnDestroy
 	private generatorStats(node: GeneratorNode): string
 	{
 		const clock = node.clockSpeed === 100 ? '' : ` @ ${this.rateFormatter.clock(node.clockSpeed)}%`;
-		return `${this.rateFormatter.amount(node.amount)}×${clock} (${node.fuel.item.name}) - ${this.rateFormatter.power(node.powerProduction())}`;
+		return `${this.rateFormatter.amount(node.amount)}×${clock} (${node.fuel.item.name}) → ${this.rateFormatter.power(node.powerProduction())}`;
 	}
 
 	private augmenterStats(node: AugmenterNode): string

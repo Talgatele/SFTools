@@ -49,7 +49,7 @@ export class OldPlanImporter
 
 	public async withGraph(plan: Plan, source: OldProductionData, sourceVersion: OldGameVersion, data: Data): Promise<OldPlanImport>
 	{
-		const hasSatisfactoryMode = plan.requests.some(request => request.mode === 'satisfactory');
+		const hasSatisfactoryMode = plan.requests.some(request => (request.mode === 'satisfactory' || request.mode === 'satisfactory-plus'));
 		if (!hasSatisfactoryMode) {
 			const carried = this.nodesFromOldResult(source.result, plan, data);
 			if (carried !== null) {
@@ -118,7 +118,7 @@ export class OldPlanImporter
 			return null;
 		}
 		const maximised = new Set(plan.requests
-			.filter(request => request.mode === 'maximise' || request.mode === 'satisfactory')
+			.filter(request => request.mode === 'maximise' || (request.mode === 'satisfactory' || request.mode === 'satisfactory-plus'))
 			.map(request => request.itemClassName));
 		let achievedMaximums: Record<string, number> | undefined;
 		for (const node of conversion.nodes) {

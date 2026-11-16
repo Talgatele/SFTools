@@ -78,7 +78,7 @@ export class CalculatorProductionTabComponent implements OnDestroy
 
 	private blankRow(): ProductionRequest
 	{
-		return {itemClassName: '', ratePerMinute: 0, mode: 'satisfactory'};
+		return {itemClassName: '', ratePerMinute: 0, mode: 'satisfactory-plus'};
 	}
 
 	public get availableItems(): Item[]
@@ -104,12 +104,32 @@ export class CalculatorProductionTabComponent implements OnDestroy
 
 	public onItemChange(row: ProductionRequest, value: string): void
 	{
+		const previous = row.itemClassName;
 		row.itemClassName = value;
 		row.satisfactoryOverride = undefined;
-		if (value !== this.powerTargetClass) {
+		if (value === this.powerTargetClass && previous !== value) {
+			// Power planning starts by using the available supply, without rounding away output.
+			row.mode = this.maximiseDisabled(row) ? undefined : 'maximise';
+			const settings = this.planManager.activeSettings();
+			const data = this.versionManager.activeVersionData();
+			// A new plan has no enabled fuels. Make its first power request usable,
+			// while preserving any fuel choices the user has already configured.
+			if (settings && data && settings.enabledFuels === undefined) {
+				this.planManager.updateActiveSettings({
+					...settings,
+					enabledFuels: Object.fromEntries(data.getPowerGenerators()
+						.map(generator => [generator.className, generator.fuel.map(fuel => fuel.item.className)])),
+				});
+			}
+		} else if (value !== this.powerTargetClass) {
 			row.powerUnit = undefined;
 		}
 		this.sync();
+	}
+
+	public get hasPowerTarget(): boolean
+	{
+		return this.rows.some(row => row.itemClassName === this.powerTargetClass);
 	}
 
 	public modeOf(row: ProductionRequest): ProductionRequestMode
@@ -120,6 +140,12 @@ export class CalculatorProductionTabComponent implements OnDestroy
 	/** Omitting the default keeps requests saved before maximise existed byte-identical. */
 	public setMode(row: ProductionRequest, mode: ProductionRequestMode): void
 	{
+		// Both Satisfactory modes shape the whole factory; switch automatic rows together.
+		if (mode === 'satisfactory' || mode === 'satisfactory-plus') {
+			for (const other of this.rows) {
+				if (other.mode === 'satisfactory' || other.mode === 'satisfactory-plus') other.mode = mode;
+			}
+		}
 		row.mode = mode === 'rate' ? undefined : mode;
 		row.satisfactoryOverride = undefined;
 		this.sync();
@@ -164,7 +190,7 @@ export class CalculatorProductionTabComponent implements OnDestroy
 
 	public setPowerSelection(row: ProductionRequest, selection: string): void
 	{
-		if (selection === 'maximise' || selection === 'satisfactory') {
+		if (selection === 'maximise' || selection === 'satisfactory' || selection === 'satisfactory-plus') {
 			this.setMode(row, selection);
 			return;
 		}
@@ -183,13 +209,16 @@ export class CalculatorProductionTabComponent implements OnDestroy
 		}
 	}
 
-	public maximiseDisabled(row: ProductionRequest, mode: 'maximise' | 'satisfactory' = 'maximise'): boolean
+	public maximiseDisabled(row: ProductionRequest, mode: 'maximise' | 'satisfactory' | 'satisfactory-plus' = 'maximise'): boolean
 	{
 		const active = this.rows.find(other => other !== row
 			&& this.modeOf(other) !== 'rate'
 			&& other.itemClassName !== '');
 		return active !== undefined
-			&& (this.modeOf(active) !== mode || this.categoryOf(active.itemClassName) !== this.categoryOf(row.itemClassName));
+			&& ((this.modeOf(active) !== mode
+				&& !((this.modeOf(active) === 'satisfactory' || this.modeOf(active) === 'satisfactory-plus')
+					&& (mode === 'satisfactory' || mode === 'satisfactory-plus')))
+				|| this.categoryOf(active.itemClassName) !== this.categoryOf(row.itemClassName));
 	}
 
 	public achievedFor(row: ProductionRequest): string | null

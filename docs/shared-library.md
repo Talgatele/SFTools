@@ -92,10 +92,13 @@ guessing is rate limited. SQLite transactions enforce optimistic revisions, incl
 document tombstones. The database lives outside the public web root with private permissions.
 Save request bodies are limited to 16 MiB; split very large game-version libraries if needed.
 
-Production Compose fixes `SFTOOLS_ORIGIN` to `https://satisfactory.bitstacker.dev`. Local Docker
-defaults to `http://localhost:8080`; update `SFTOOLS_ORIGIN` along with `SFTOOLS_PORT` when using
-another port. HTTP origins are allowed only on loopback hosts. The plain `npm start` dev server
-has no PHP API and explicitly uses browser-only storage; use Docker to test shared persistence.
+Production Compose fixes `SFTOOLS_ORIGIN` to `https://satisfactory.bitstacker.dev`. The library
+also accepts requests from a matching loopback origin and Host, so the app can be opened at
+`http://localhost:8080` even when the container is configured for its public hostname. Local
+Docker defaults to `http://localhost:8080`; update `SFTOOLS_ORIGIN` along with `SFTOOLS_PORT`
+when using another port. HTTP origins in the server configuration are allowed only on loopback
+hosts. The plain `npm start` dev server has no PHP API and explicitly uses browser-only storage;
+use Docker to test shared persistence.
 
 Validation: `npm test` includes shared-storage client regressions. Run
 `php tests/shared-storage.php` for HTTP tests of separate device sessions, CSRF/origin checks,

@@ -16,6 +16,10 @@ import {SubplanScaler} from '../src/app/Model/Planner/SubplanScaler.ts';
 import {PlanLabelAssigner} from '../src/app/Model/Planner/PlanLabelAssigner.ts';
 import {PlanIconResolver} from '../src/app/Model/Planner/PlanIconResolver.ts';
 import {GraphEdgeBuilder} from '../src/app/Model/Planner/Graph/GraphEdgeBuilder.ts';
+import {ProductNode} from '../src/app/Model/Planner/Solver/Response/ProductNode.ts';
+import {ByproductNode} from '../src/app/Model/Planner/Solver/Response/ByproductNode.ts';
+import {SpecialClasses} from '../src/app/Model/Planner/SpecialClasses.ts';
+import {CalculatorProductionTabComponent} from '../src/app/Components/Planner/Panels/Calculator/Tabs/Production/CalculatorProductionTabComponent.ts';
 
 // Exercise the worker's precision restoration as well as the real HiGHS engine.
 // Unpatched HiGHS rounds to six significant figures and can make boundary cases infeasible.
@@ -89,6 +93,73 @@ const check = response => {
 	for (const [name, balance] of balances) assert.ok(Math.abs(balance) < 0.001, `${name} balance: ${balance}`);
 	return response.achievedMaximums;
 };
+
+test('selecting Power starts maximisation and enables fuels for a new power plan', () => {
+	const component = Object.create(CalculatorProductionTabComponent.prototype);
+	component.powerTargetClass = SpecialClasses.PowerTarget;
+	const row = {itemClassName: '', mode: 'satisfactory', ratePerMinute: 0};
+	component.rows = [row];
+	let settings = {};
+	component.planManager = {activeSettings: () => settings, updateActiveSettings: value => settings = value};
+	component.versionManager = {activeVersionData: () => ({getPowerGenerators: () => [
+		{className: 'CoalGenerator', fuel: [{item: {className: 'Coal'}}]},
+	]})};
+	let synced = 0;
+	component.sync = () => synced++;
+	component.onItemChange(row, SpecialClasses.PowerTarget);
+	assert.equal(row.mode, 'maximise');
+	assert.deepEqual(settings.enabledFuels, {CoalGenerator: ['Coal']});
+	assert.equal(component.hasPowerTarget, true);
+	assert.equal(synced, 1);
+
+	// Selecting power again preserves an explicitly chosen rate and fuel configuration.
+	row.mode = undefined;
+	settings = {enabledFuels: {CoalGenerator: []}};
+	component.onItemChange(row, SpecialClasses.PowerTarget);
+	assert.equal(row.mode, undefined);
+	assert.deepEqual(settings.enabledFuels, {CoalGenerator: []});
+	row.itemClassName = 'Rod';
+	component.onItemChange(row, SpecialClasses.PowerTarget);
+	assert.deepEqual(settings.enabledFuels, {CoalGenerator: []});
+
+	component.rows.push({itemClassName: 'Rod', mode: 'satisfactory', ratePerMinute: 0});
+	row.itemClassName = '';
+	component.onItemChange(row, SpecialClasses.PowerTarget);
+	assert.equal(row.mode, undefined, 'incompatible automatic targets keep power at a fixed rate');
+});
+
+test('power maximisation respects both coal and water supply and builds connected generator nodes', async () => {
+	const coal = Object.assign(Object.create(Item.prototype), {className: 'Coal', name: 'Coal', energy: 300, form: 'solid'});
+	const water = Object.assign(Object.create(Item.prototype), {className: SpecialClasses.WaterItem, name: 'Water', form: 'liquid'});
+	const fuel = {item: coal, supplementalItem: water, byproduct: null, byproductAmount: 0};
+	const generator = {className: 'CoalGenerator', name: 'Coal-Powered Generator', powerProduction: 75,
+		supplementalToPowerRatio: 10, canOverclock: true, fuel: [fuel]};
+	const powerData = {...data, items: [coal, water], resources: ['Coal', water.className],
+		getItemByClassName: name => name === 'Coal' ? coal : water,
+		searchItemByClassName: name => [coal, water].find(item => item.className === name),
+		getBuildingByClassName: () => generator, searchBuildingByClassName: () => generator};
+	for (const [waterSupply, expectedPower, expectedCoal] of [[1440, 2400, 480], [1000, 1000 / 45 * 75, 1000 / 3]]) {
+		const p = {settings: {enabledFuels: {CoalGenerator: ['Coal']}}, requests: [
+			{itemClassName: SpecialClasses.PowerTarget, mode: 'maximise', ratePerMinute: 0},
+		], inputs: [{itemClassName: 'Coal', amount: 480}, {itemClassName: water.className, amount: waterSupply}]};
+		const instance = service();
+		const request = {...base(0, []), resourceLimits: {Coal: 0, [water.className]: 0},
+			inputs: instance.inputSources(p, powerData), generators: instance.enabledGenerators(p, powerData)};
+		const result = await firstValueFrom(instance.solveMaximise(p, powerData, request,
+			instance.maximiseTarget(p, powerData), []));
+		assert.equal(result.status, 'Optimal');
+		assert.ok(Math.abs(result.achievedMaximums[SpecialClasses.PowerTarget] - expectedPower) < 0.00001);
+		const generators = result.nodes.filter(node => node.type === 'generator');
+		assert.equal(generators.length, 1);
+		assert.ok(Math.abs(generators[0].amount - expectedPower / 75) < 0.00001);
+		assert.ok(Math.abs(generators[0].powerProduction() - expectedPower) < 0.00001);
+		const edges = new GraphEdgeBuilder().build(result.nodes);
+		assert.equal(edges.length, 2);
+		assert.ok(edges.every(edge => edge.targetId === generators[0].id));
+		assert.ok(Math.abs(edges.find(edge => edge.itemClassName === 'Coal').amount - expectedCoal) < 0.00001);
+		assert.ok(Math.abs(edges.find(edge => edge.itemClassName === water.className).amount - waterSupply) < 0.00001);
+	}
+});
 
 test('machine weights select the cheaper building and whole counting charges complete machines', async () => {
 	const otherMachine = {...machine, className: 'Assembler'};
@@ -406,4 +477,119 @@ test('manual icons, including no icon, are preserved; old automatic icons refres
 	assert.equal(labels.assign({...legacy, iconClassName: 'Plastic'}).autoIcon, false);
 	const assigned = labels.assign(p);
 	assert.equal(labels.assign(assigned), assigned);
+});
+
+
+test('Satisfactory+ keeps every production machine at 100% despite clock overrides', async () => {
+	const p = plan();
+	p.requests.forEach(row => row.mode = 'satisfactory-plus');
+	const request = {...base(719.5), defaultClockSpeed: 175,
+		recipeClockSpeeds: {Smelt: 250}, machineClockSpeeds: {Constructor: 50}};
+	const response = await run(p, request);
+	check(response);
+	const machines = response.nodes.filter(node => node.type === 'recipe');
+	assert.ok(machines.length > 0);
+	for (const node of machines) {
+		assert.ok(Number.isInteger(node.target), `${node.recipe.className}: ${node.target}`);
+		for (const group of node.groups) {
+			assert.equal(group.clockSpeed, 100);
+			assert.ok(Number.isInteger(group.machines));
+		}
+	}
+	assert.ok(response.achievedMaximums.Motor > 0);
+});
+
+test('Satisfactory+ preserves exact custom outputs using whole machines', async () => {
+	const p = {...plan(), requests: [{itemClassName: 'Rod', mode: 'satisfactory-plus',
+		ratePerMinute: 0, satisfactoryOverride: 15.125}]};
+	const response = await run(p);
+	check(response);
+	assert.equal(p.requests[0].satisfactoryOverride, 15.125);
+	assert.equal(response.achievedMaximums.Rod, 16);
+	assert.equal(response.nodes.find(node => node.type === 'product' && node.item.className === 'Rod').amount, 16);
+	assert.ok(!response.nodes.some(node => node.type === 'byproduct' && node.item.className === 'Rod'));
+	for (const node of response.nodes.filter(node => node.type === 'recipe')) {
+		assert.ok(Number.isInteger(node.target));
+		assert.ok(node.groups.every(group => group.clockSpeed === 100));
+	}
+});
+
+test('Satisfactory+ is detected and scales custom rates', () => {
+	const p = {...plan(), requests: [{itemClassName: 'Rod', mode: 'satisfactory-plus',
+		ratePerMinute: 0, satisfactoryOverride: 15.125}]};
+	assert.equal(service().maximiseTarget(p, data).satisfactory, true);
+	p.inputs = [];
+	let scaled;
+	const scaler = new SubplanScaler({isReadOnlyPlan: () => false, findPlan: () => p,
+		setRequests: (_id, rows) => {scaled = rows;}, setInputs: () => {}}, {}, {}, {}, {});
+	scaler.scale('plan', 2);
+	assert.equal(scaled[0].satisfactoryOverride, 30.25);
+});
+
+
+test('Satisfactory+ rejects locked machines with partial clocks', async () => {
+	const p = plan();
+	p.requests.forEach(row => row.mode = 'satisfactory-plus');
+	const response = await run(p);
+	const node = response.nodes.find(node => node.type === 'recipe');
+	node.groups[0] = {...node.groups[0], clockSpeed: 50};
+	assert.throws(() => service().solveMaximise(p, data, base(),
+		{category: 'items', satisfactory: true, items: selection.map(item)}, [node]), /locked machines/);
+});
+
+
+test('Satisfactory+ power uses whole generators at 100% with limited water', async () => {
+	const coal = Object.assign(Object.create(Item.prototype), {className: 'Coal', energy: 300, form: 'solid'});
+	const water = Object.assign(Object.create(Item.prototype), {className: SpecialClasses.WaterItem, form: 'liquid'});
+	const fuel = {item: coal, supplementalItem: water, byproduct: null, byproductAmount: 0};
+	const generator = {className: 'CoalGenerator', powerProduction: 75,
+		supplementalToPowerRatio: 10, canOverclock: true, fuel: [fuel]};
+	const powerData = {...data, items: [coal, water], resources: ['Coal', water.className],
+		getItemByClassName: name => name === 'Coal' ? coal : water,
+		searchItemByClassName: name => [coal, water].find(item => item.className === name),
+		getBuildingByClassName: () => generator};
+	const p = {settings: {}, requests: [{itemClassName: SpecialClasses.PowerTarget,
+		mode: 'satisfactory-plus', ratePerMinute: 0}]};
+	const instance = service();
+	const request = {...base(0, []), resourceLimits: {Coal: 480, [water.className]: 1000},
+		generators: [{generator, fuel, clockSpeed: 250}]};
+	const response = await firstValueFrom(instance.solveMaximise(p, powerData, request,
+		instance.maximiseTarget(p, powerData), []));
+	assert.equal(response.status, 'Optimal');
+	const generators = response.nodes.filter(node => node.type === 'generator');
+	assert.equal(generators.length, 1);
+	assert.equal(generators[0].clockSpeed, 100);
+	assert.equal(generators[0].amount, 22);
+	assert.equal(response.achievedMaximums[SpecialClasses.PowerTarget], 1650);
+});
+
+
+test('switching to Satisfactory+ updates existing automatic rows together', () => {
+	const component = Object.create(CalculatorProductionTabComponent.prototype);
+	component.rows = [
+		{itemClassName: 'Rod', mode: 'satisfactory', ratePerMinute: 0},
+		{itemClassName: 'Plate', mode: 'satisfactory', ratePerMinute: 0, satisfactoryOverride: 10},
+	];
+	component.sync = () => {};
+	assert.equal(component.maximiseDisabled(component.rows[0], 'satisfactory-plus'), false);
+	component.setMode(component.rows[0], 'satisfactory-plus');
+	assert.ok(component.rows.every(row => row.mode === 'satisfactory-plus'));
+	assert.equal(component.rows[1].satisfactoryOverride, 10);
+});
+
+
+test('requested surplus joins green products, including zero targets, while other byproducts remain', () => {
+	const p = {requests: [{itemClassName: 'Plate'}, {itemClassName: 'Rotor'}]};
+	const result = service().rollUpRequestedSurplus({status: 'Optimal', achievedMaximums: {Plate: 88.7, Rotor: 0}, nodes: [
+		new ProductNode('plate', 88.7, item('Plate')),
+		new ByproductNode('plate-extra', 0.05, item('Plate')),
+		new ByproductNode('rotor-extra', 2.25, item('Rotor')),
+		new ByproductNode('ingot-extra', 10, item('Ingot')),
+	]}, p);
+	assert.equal(result.nodes.length, 3);
+	assert.equal(result.nodes.find(node => node.id === 'plate').amount, 88.75);
+	assert.equal(result.nodes.find(node => node.item.className === 'Rotor').type, 'product');
+	assert.equal(result.nodes.find(node => node.item.className === 'Ingot').type, 'byproduct');
+	assert.deepEqual(result.achievedMaximums, {Plate: 88.75, Rotor: 2.25});
+	assert.deepEqual(service().rollUpRequestedSurplus(result, p), result);
 });

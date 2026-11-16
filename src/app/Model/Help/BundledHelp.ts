@@ -23,6 +23,7 @@ export function withBundledHelp(manifest: HelpManifest | null): HelpManifest
 					{id: 'fixed-rates', title: 'Fixed rates', level: 2},
 					{id: 'maximise', title: 'Maximise', level: 2},
 					{id: 'satisfactory-mode', title: 'Satisfactory mode', level: 2},
+					{id: 'satisfactory-plus-mode', title: 'Satisfactory+ mode', level: 2},
 					{id: 'custom-rates-in-satisfactory-mode', title: 'Custom rates in Satisfactory mode', level: 3},
 					{id: 'removing', title: 'Removing', level: 2},
 				],
