@@ -1,0 +1,357 @@
+{
+	"items": {
+		"Desc_Cable_C": "Cable",
+		"Desc_Cement_C": "Concrete",
+		"Desc_Coal_C": "Coal",
+		"Desc_CopperIngot_C": "Copper Ingot",
+		"Desc_IronIngot_C": "Iron Ingot",
+		"Desc_IronPlateReinforced_C": "Reinforced Iron Plate",
+		"Desc_IronPlate_C": "Iron Plate",
+		"Desc_IronRod_C": "Iron Rod",
+		"Desc_IronScrew_C": "Screws",
+		"Desc_ModularFrame_C": "Modular Frame",
+		"Desc_OreCopper_C": "Copper Ore",
+		"Desc_OreIron_C": "Iron Ore",
+		"Desc_SpaceElevatorPart_2_C": "Versatile Framework",
+		"Desc_SpaceElevatorPart_3_C": "Automated Wiring",
+		"Desc_Stator_C": "Stator",
+		"Desc_SteelIngot_C": "Steel Ingot",
+		"Desc_SteelPipe_C": "Steel Pipe",
+		"Desc_SteelPlateReinforced_C": "Encased Industrial Beam",
+		"Desc_SteelPlate_C": "Steel Beam",
+		"Desc_Stone_C": "Limestone",
+		"Desc_Wire_C": "Wire"
+	},
+	"recipes": [
+		{
+			"className": "Recipe_IngotIron_C",
+			"name": "Iron Ingot",
+			"time": 2,
+			"ingredients": [
+				{
+					"item": "Desc_OreIron_C",
+					"amount": 1
+				}
+			],
+			"products": [
+				{
+					"item": "Desc_IronIngot_C",
+					"amount": 1
+				}
+			]
+		},
+		{
+			"className": "Recipe_IngotCopper_C",
+			"name": "Copper Ingot",
+			"time": 2,
+			"ingredients": [
+				{
+					"item": "Desc_OreCopper_C",
+					"amount": 1
+				}
+			],
+			"products": [
+				{
+					"item": "Desc_CopperIngot_C",
+					"amount": 1
+				}
+			]
+		},
+		{
+			"className": "Recipe_IngotSteel_C",
+			"name": "Steel Ingot",
+			"time": 4,
+			"ingredients": [
+				{
+					"item": "Desc_OreIron_C",
+					"amount": 3
+				},
+				{
+					"item": "Desc_Coal_C",
+					"amount": 3
+				}
+			],
+			"products": [
+				{
+					"item": "Desc_SteelIngot_C",
+					"amount": 3
+				}
+			]
+		},
+		{
+			"className": "Recipe_IronRod_C",
+			"name": "Iron Rod",
+			"time": 4,
+			"ingredients": [
+				{
+					"item": "Desc_IronIngot_C",
+					"amount": 1
+				}
+			],
+			"products": [
+				{
+					"item": "Desc_IronRod_C",
+					"amount": 1
+				}
+			]
+		},
+		{
+			"className": "Recipe_IronPlate_C",
+			"name": "Iron Plate",
+			"time": 6,
+			"ingredients": [
+				{
+					"item": "Desc_IronIngot_C",
+					"amount": 3
+				}
+			],
+			"products": [
+				{
+					"item": "Desc_IronPlate_C",
+					"amount": 2
+				}
+			]
+		},
+		{
+			"className": "Recipe_Screw_C",
+			"name": "Screws",
+			"time": 6,
+			"ingredients": [
+				{
+					"item": "Desc_IronRod_C",
+					"amount": 1
+				}
+			],
+			"products": [
+				{
+					"item": "Desc_IronScrew_C",
+					"amount": 4
+				}
+			]
+		},
+		{
+			"className": "Recipe_IronPlateReinforced_C",
+			"name": "Reinforced Iron Plate",
+			"time": 12,
+			"ingredients": [
+				{
+					"item": "Desc_IronPlate_C",
+					"amount": 6
+				},
+				{
+					"item": "Desc_IronScrew_C",
+					"amount": 12
+				}
+			],
+			"products": [
+				{
+					"item": "Desc_IronPlateReinforced_C",
+					"amount": 1
+				}
+			]
+		},
+		{
+			"className": "Recipe_ModularFrame_C",
+			"name": "Modular Frame",
+			"time": 60,
+			"ingredients": [
+				{
+					"item": "Desc_IronPlateReinforced_C",
+					"amount": 3
+				},
+				{
+					"item": "Desc_IronRod_C",
+					"amount": 12
+				}
+			],
+			"products": [
+				{
+					"item": "Desc_ModularFrame_C",
+					"amount": 2
+				}
+			]
+		},
+		{
+			"className": "Recipe_Wire_C",
+			"name": "Wire",
+			"time": 4,
+			"ingredients": [
+				{
+					"item": "Desc_CopperIngot_C",
+					"amount": 1
+				}
+			],
+			"products": [
+				{
+					"item": "Desc_Wire_C",
+					"amount": 2
+				}
+			]
+		},
+		{
+			"className": "Recipe_Cable_C",
+			"name": "Cable",
+			"time": 2,
+			"ingredients": [
+				{
+					"item": "Desc_Wire_C",
+					"amount": 2
+				}
+			],
+			"products": [
+				{
+					"item": "Desc_Cable_C",
+					"amount": 1
+				}
+			]
+		},
+		{
+			"className": "Recipe_Stator_C",
+			"name": "Stator",
+			"time": 12,
+			"ingredients": [
+				{
+					"item": "Desc_SteelPipe_C",
+					"amount": 3
+				},
+				{
+					"item": "Desc_Wire_C",
+					"amount": 8
+				}
+			],
+			"products": [
+				{
+					"item": "Desc_Stator_C",
+					"amount": 1
+				}
+			]
+		},
+		{
+			"className": "Recipe_Concrete_C",
+			"name": "Concrete",
+			"time": 4,
+			"ingredients": [
+				{
+					"item": "Desc_Stone_C",
+					"amount": 3
+				}
+			],
+			"products": [
+				{
+					"item": "Desc_Cement_C",
+					"amount": 1
+				}
+			]
+		},
+		{
+			"className": "Recipe_EncasedIndustrialBeam_C",
+			"name": "Encased Industrial Beam",
+			"time": 10,
+			"ingredients": [
+				{
+					"item": "Desc_SteelPlate_C",
+					"amount": 3
+				},
+				{
+					"item": "Desc_Cement_C",
+					"amount": 6
+				}
+			],
+			"products": [
+				{
+					"item": "Desc_SteelPlateReinforced_C",
+					"amount": 1
+				}
+			]
+		},
+		{
+			"className": "Recipe_SteelBeam_C",
+			"name": "Steel Beam",
+			"time": 4,
+			"ingredients": [
+				{
+					"item": "Desc_SteelIngot_C",
+					"amount": 4
+				}
+			],
+			"products": [
+				{
+					"item": "Desc_SteelPlate_C",
+					"amount": 1
+				}
+			]
+		},
+		{
+			"className": "Recipe_SteelPipe_C",
+			"name": "Steel Pipe",
+			"time": 6,
+			"ingredients": [
+				{
+					"item": "Desc_SteelIngot_C",
+					"amount": 3
+				}
+			],
+			"products": [
+				{
+					"item": "Desc_SteelPipe_C",
+					"amount": 2
+				}
+			]
+		},
+		{
+			"className": "Recipe_SpaceElevatorPart_2_C",
+			"name": "Versatile Framework",
+			"time": 24,
+			"ingredients": [
+				{
+					"item": "Desc_ModularFrame_C",
+					"amount": 1
+				},
+				{
+					"item": "Desc_SteelPlate_C",
+					"amount": 12
+				}
+			],
+			"products": [
+				{
+					"item": "Desc_SpaceElevatorPart_2_C",
+					"amount": 2
+				}
+			]
+		},
+		{
+			"className": "Recipe_SpaceElevatorPart_3_C",
+			"name": "Automated Wiring",
+			"time": 24,
+			"ingredients": [
+				{
+					"item": "Desc_Stator_C",
+					"amount": 1
+				},
+				{
+					"item": "Desc_Cable_C",
+					"amount": 20
+				}
+			],
+			"products": [
+				{
+					"item": "Desc_SpaceElevatorPart_3_C",
+					"amount": 1
+				}
+			]
+		}
+	],
+	"resourceLimits": {
+		"Desc_OreIron_C": 480,
+		"Desc_OreCopper_C": 240,
+		"Desc_Coal_C": 480,
+		"Desc_Stone_C": 240
+	},
+	"requests": [
+		"Desc_SteelPlate_C",
+		"Desc_SteelPipe_C",
+		"Desc_SteelPlateReinforced_C",
+		"Desc_SpaceElevatorPart_2_C",
+		"Desc_SpaceElevatorPart_3_C"
+	]
+}

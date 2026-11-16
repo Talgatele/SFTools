@@ -43,7 +43,8 @@ import {RecipeNode} from '@src/Model/Planner/Solver/Response/RecipeNode';
 import {SinkNode} from '@src/Model/Planner/Solver/Response/SinkNode';
 import {SubplanNode} from '@src/Model/Planner/Solver/Response/SubplanNode';
 import {preferSpaceElevatorRecipes, satisfactoryRecipeRate, satisfactoryTargets} from '@src/Model/Planner/SatisfactoryTargets';
-import {SatisfactoryFactoryRefinement} from '@src/Model/Planner/SatisfactoryFactoryRefinement';
+import {FactoryRefinement, SatisfactoryFactoryRefinement} from '@src/Model/Planner/SatisfactoryFactoryRefinement';
+import {IntermediateSurplusRefinement} from '@src/Model/Planner/IntermediateSurplusRefinement';
 import {SolveSettingsError} from '@src/Model/Planner/Solver/SolveSettingsError';
 
 @Injectable({providedIn: 'root'})
@@ -684,12 +685,13 @@ export class ProductionSolverService
 		return 'locked_' + node.id.replace(/-/g, '');
 	}
 
-	private buildLp(request: SolverRequest, data: Data, lockedNodes: Node[] = [], refinement?: SatisfactoryFactoryRefinement): string
+	private buildLp(request: SolverRequest, data: Data, lockedNodes: Node[] = [], refinement?: FactoryRefinement): string
 	{
 		const lines: string[] = ['\\\\ Production Plan', 'Minimize'];
 		// Integer "_count >= column" companions, shared by somersloops and whole-machine counting.
 		const countedColumns = new Set<string>();
 		const fullSpeedColumns = new Set<string>();
+		const wholeMachineProducts = request.wholeMachineProducts === undefined ? null : new Set(request.wholeMachineProducts);
 
 		if (refinement) {
 			lines.push(refinement.objective);
@@ -776,7 +778,10 @@ export class ProductionSolverService
 				for (let sloops = 0; sloops <= Math.min(request.maxSloops, machine.sloopSlots); sloops++) {
 					const boost = Formulas.sloopOutputMultiplier(machine, sloops);
 					const recipeClass = recipe.className + '@' + machine.className + '%' + clockSpeed + '#' + sloops;
-					if (request.fullSpeedMachines) fullSpeedColumns.add(recipeClass);
+					if (request.fullSpeedMachines && (wholeMachineProducts === null
+						|| recipe.products.some(product => wholeMachineProducts.has(product.item.className)))) {
+						fullSpeedColumns.add(recipeClass);
+					}
 
 					recipe.ingredients.forEach(ingredient => {
 						const amount = ingredient.amount * speed;
@@ -1140,11 +1145,12 @@ export class ProductionSolverService
 	{
 		if (plan.requests.some(row => row.mode === 'satisfactory-plus')) {
 			if (lockedNodes.some(node => node instanceof RecipeNode
-				? node.groups.some(group => group.clockSpeed !== 100 || !Number.isInteger(group.machines))
+				? node.groups.some(group => group.clockSpeed < 1 || group.clockSpeed > 100 || !Number.isInteger(group.machines))
 				: node instanceof GeneratorNode && (node.clockSpeed !== 100 || !Number.isInteger(node.amount)))) {
-				throw new SolveSettingsError('Satisfactory+ requires locked machines to run at 100% with whole machine counts. Unlock or update these machines.');
+				throw new SolveSettingsError('Satisfactory+ requires whole locked machine counts and production clocks between 1% and 100%. Locked generators must run at 100%. Unlock or update these machines.');
 			}
 			base = {...base, fullSpeedMachines: true, defaultClockSpeed: 100,
+				wholeMachineProducts: plan.requests.filter(row => row.itemClassName !== '').map(row => row.itemClassName),
 				recipeClockSpeeds: {}, machineClockSpeeds: {}, generatorClockSpeeds: {},
 				generators: base.generators.map(option => ({...option, clockSpeed: 100}))};
 		}
@@ -1299,7 +1305,36 @@ export class ProductionSolverService
 				}
 			}
 		}
-		const response = this.parseSolution(solution, data, this.groupingModes.resolve(plan.settings));
+		if (request.fullSpeedMachines && this.mapStatus(solution.Status) === 'Optimal') {
+			const baseline = this.columnsOf(solution);
+			const requestedItems = new Set(plan.requests.map(row => row.itemClassName));
+			const hasIntermediateSurplus = [...baseline].some(([variable, amount]) =>
+				variable.endsWith('@Byproduct') && amount > 1e-6 && !requestedItems.has(variable.split('@')[0]));
+			if (hasIntermediateSurplus) {
+				// Freeze actual delivered totals, including requested surplus, before relaxing machine counts.
+				const cleanup: SolverRequest = {...request, fullSpeedMachines: false,
+					productions: request.productions.map(production => ({...production, amount:
+						(baseline.get(production.item.className + '@Product') ?? 0)
+						+ (baseline.get(production.item.className + '@Byproduct') ?? 0)}))};
+				try {
+					const cleaned = await this.awaitSolve(this.buildLp(cleanup, data, lockedNodes,
+						new IntermediateSurplusRefinement(baseline, requestedItems)), {
+						workerOptions: {mipRelGap: 0, timeLimitSeconds: 5}, timeoutMs: 10_000,
+					}, run);
+					if (this.mapStatus(cleaned.Status) === 'Optimal') {
+						solution = cleaned;
+						for (const item of Object.keys(achieved)) {
+							achieved[item] = this.columnsOf(solution).get(item + '@Product') ?? 0;
+						}
+					}
+				} catch (error) {
+					if (run.cancelled) throw error;
+					console.warn('Satisfactory+ surplus cleanup kept the original plan:', error);
+				}
+			}
+		}
+		const response = this.parseSolution(solution, data,
+			request.fullSpeedMachines ? 'underclock-last' : this.groupingModes.resolve(plan.settings));
 		return {...response, nodes: [...response.nodes, ...this.augmenterNodes(plan, data)], achievedMaximums: achieved};
 	}
 

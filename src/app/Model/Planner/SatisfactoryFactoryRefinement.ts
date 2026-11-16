@@ -15,7 +15,16 @@ interface SimplicityMetric
 }
 
 /** A bounded second pass over the chosen routes, rather than a new recipe search. */
-export class SatisfactoryFactoryRefinement
+export interface FactoryRefinement
+{
+	readonly constraints: string[];
+	readonly generals: string[];
+	readonly binaries: string[];
+	readonly productionRanges: Map<string, RateRange>;
+	readonly objective: string;
+}
+
+export class SatisfactoryFactoryRefinement implements FactoryRefinement
 {
 	public readonly constraints: string[] = [];
 	public readonly generals: string[] = [];

@@ -37,7 +37,7 @@ new Function('module', 'exports', 'require', '__dirname', patchSolutionPrecision
 const highs = await highsModule.exports();
 const machine = {className: 'Constructor', manufacturingSpeed: 1, sloopSlots: 0, sloopBoost: 1,
 	powerUsage: 4, powerUsageExponent: 1.6, fuel: []};
-const itemNames = ['Ore', 'Ingot', 'Rod', 'Plate', 'Screw', 'ReinforcedPlate', 'Rotor', 'Frame', 'Stator', 'Motor', 'Plastic', 'Desc_SpaceElevatorPart_1_C', 'Late1', 'Late2', 'Late3'];
+const itemNames = ['Concrete', 'Ore', 'Ingot', 'Rod', 'Plate', 'Screw', 'ReinforcedPlate', 'Rotor', 'Frame', 'Stator', 'Motor', 'Plastic', 'Desc_SpaceElevatorPart_1_C', 'Late1', 'Late2', 'Late3'];
 const items = itemNames.map(className => Object.assign(Object.create(Item.prototype), {className, sinkPoints: 0, form: 'solid'}));
 const item = name => items.find(item => item.className === name);
 const quantities = values => Object.entries(values).map(([name, amount]) => ({item: item(name), amount}));
@@ -585,14 +585,14 @@ test('Satisfactory+ is detected and scales custom rates', () => {
 });
 
 
-test('Satisfactory+ rejects locked machines with partial clocks', async () => {
+test('Satisfactory+ rejects overclocked locked machines', async () => {
 	const p = plan();
 	p.requests.forEach(row => row.mode = 'satisfactory-plus');
 	const response = await run(p);
 	const node = response.nodes.find(node => node.type === 'recipe');
-	node.groups[0] = {...node.groups[0], clockSpeed: 50};
+	node.groups[0] = {...node.groups[0], clockSpeed: 150};
 	assert.throws(() => service().solveMaximise(p, data, base(),
-		{category: 'items', satisfactory: true, items: selection.map(item)}, [node]), /locked machines/);
+		{category: 'items', satisfactory: true, items: selection.map(item)}, [node]), /locked machine/);
 });
 
 
@@ -650,4 +650,86 @@ test('requested surplus joins green products, including zero targets, while othe
 	assert.equal(result.nodes.find(node => node.item.className === 'Ingot').type, 'byproduct');
 	assert.deepEqual(result.achievedMaximums, {Plate: 88.75, Rotor: 2.25});
 	assert.deepEqual(service().rollUpRequestedSurplus(result, p), result);
+});
+
+
+test('Satisfactory+ underclocks unrequested intermediates and their supply instead of leaving byproducts', async () => {
+	const chain = [
+		recipe('Smelt', {Ore: 30}, {Ingot: 30}),
+		recipe('Rods', {Ingot: 15}, {Rod: 15}),
+		recipe('Plates', {Ingot: 30}, {Plate: 20}),
+		recipe('Screws', {Rod: 10}, {Screw: 40}),
+		recipe('ReinforcedPlates', {Plate: 30, Screw: 60}, {ReinforcedPlate: 5}),
+		recipe('Concrete', {Ore: 45}, {Concrete: 15}),
+		recipe('Frames', {ReinforcedPlate: 2, Concrete: 40}, {Frame: 2}),
+	];
+	const chainData = {...data, getRecipesForMachines: () => chain,
+		getRecipeByClassName: name => chain.find(recipe => recipe.className === name)};
+	const p = {settings: {}, requests: [{itemClassName: 'Frame', mode: 'satisfactory-plus',
+		ratePerMinute: 0, satisfactoryOverride: 2}]};
+	// Even a no-clocking display preference must not recreate the surplus we just removed.
+	const instance = service();
+	instance.groupingModes = {resolve: () => 'no-clocking'};
+	const result = await firstValueFrom(instance.solveMaximise(p, chainData, base(300, chain),
+		{category: 'items', satisfactory: true, items: [item('Frame')]}, []));
+	check(result);
+	assert.equal(result.achievedMaximums.Frame, 2);
+	assert.ok(!result.nodes.some(node => node.type === 'byproduct'));
+	assert.equal(result.nodes.find(node => node.type === 'mine').amount, 144);
+	const reinforced = result.nodes.find(node => node.type === 'recipe' && node.recipe.className === 'ReinforcedPlates');
+	assert.equal(reinforced.target, 0.4);
+	assert.deepEqual(reinforced.groups, [{machines: 1, clockSpeed: 40, sloops: 0}]);
+	const concrete = result.nodes.find(node => node.type === 'recipe' && node.recipe.className === 'Concrete');
+	assert.ok(Math.abs(concrete.target - 40 / 15) < 1e-8);
+	assert.equal(concrete.groups[0].machines, 2);
+	assert.equal(concrete.groups[0].clockSpeed, 100);
+	assert.equal(concrete.groups[1].clockSpeed, 66.6667);
+	const frame = result.nodes.find(node => node.type === 'recipe' && node.recipe.className === 'Frames');
+	assert.deepEqual(frame.groups, [{machines: 1, clockSpeed: 100, sloops: 0}]);
+});
+
+
+test('Satisfactory+ retains unavoidable co-products rather than hiding or discarding them', async () => {
+	const coProduct = recipe('Frames', {Ore: 1}, {Frame: 2, Concrete: 3});
+	const chainData = {...data, getRecipesForMachines: () => [coProduct], getRecipeByClassName: () => coProduct};
+	const p = {settings: {}, requests: [{itemClassName: 'Frame', mode: 'satisfactory-plus',
+		ratePerMinute: 0, satisfactoryOverride: 2}]};
+	const result = await firstValueFrom(service().solveMaximise(p, chainData, base(300, [coProduct]),
+		{category: 'items', satisfactory: true, items: [item('Frame')]}, []));
+	check(result);
+	assert.equal(result.achievedMaximums.Frame, 2);
+	assert.equal(result.nodes.find(node => node.type === 'byproduct').amount, 3);
+	assert.equal(result.nodes.find(node => node.type === 'recipe').target, 1);
+});
+
+
+test('Steel Beam factory allocates freed intermediate capacity before fixing requested outputs', async () => {
+	const fixture = JSON.parse(readFileSync(new URL('./fixtures/steel-beam-factory.json', import.meta.url), 'utf8'));
+	const parts = new Map(Object.entries(fixture.items).map(([className, name]) => [className,
+		Object.assign(Object.create(Item.prototype), {className, name, form: 'solid', sinkPoints: 0})]));
+	const hydrate = values => values.map(value => ({...value, item: parts.get(value.item)}));
+	const chain = fixture.recipes.map(recipe => ({...recipe, alternate: false, producedIn: [machine],
+		ingredients: hydrate(recipe.ingredients), products: hydrate(recipe.products)}));
+	const chainData = {items: [...parts.values()], resources: Object.keys(fixture.resourceLimits),
+		getRecipesForMachines: () => chain, getItemByClassName: name => parts.get(name),
+		searchItemByClassName: name => parts.get(name),
+		getRecipeByClassName: name => chain.find(recipe => recipe.className === name),
+		getBuildingByClassName: () => machine, searchBuildingByClassName: () => undefined};
+	const p = {settings: {}, requests: fixture.requests.map(itemClassName =>
+		({itemClassName, mode: 'satisfactory-plus', ratePerMinute: 0}))};
+	const request = {...base(480, chain), resourceLimits: fixture.resourceLimits,
+		optimisation: {...base().optimisation, rawResources: Object.fromEntries(chainData.resources.map(name => [name, 1]))}};
+	const response = await firstValueFrom(service().solveMaximise(p, chainData, request,
+		{category: 'items', satisfactory: true, items: fixture.requests.map(name => parts.get(name))}, []));
+	check(response);
+	assert.equal(response.achievedMaximums.Desc_SteelPlate_C, 15);
+	assert.equal(response.achievedMaximums.Desc_SteelPipe_C, 25);
+	assert.equal(response.achievedMaximums.Desc_SpaceElevatorPart_2_C, 10);
+	assert.equal(response.achievedMaximums.Desc_SpaceElevatorPart_3_C, 5);
+	assert.ok(!response.nodes.some(node => node.type === 'byproduct'));
+	for (const node of response.nodes.filter(node => node.type === 'mine')) {
+		assert.ok(node.amount <= fixture.resourceLimits[node.item.className] + 1e-5);
+	}
+	const beams = response.nodes.find(node => node.type === 'recipe' && node.recipe.className === 'Recipe_SteelBeam_C');
+	assert.deepEqual(beams.groups, [{machines: 5, clockSpeed: 100, sloops: 0}]);
 });
